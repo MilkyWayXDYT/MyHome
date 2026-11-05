@@ -25,6 +25,7 @@ import androidx.compose.runtime.DisposableEffect
 import kotlin.math.roundToInt
 
 class MainActivity : ComponentActivity() {
+
     private var gamepadTriggerListener: ((Int, Int) -> Unit)? = null
 
     fun setGamepadTriggerListener(listener: ((Int, Int) -> Unit)?) {
