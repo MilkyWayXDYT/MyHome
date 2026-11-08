@@ -13,6 +13,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.robotpaw.myhome.developer.ComponentGallery
 import com.robotpaw.myhome.developer.EmulatorPads
 import com.robotpaw.myhome.developer.SignalOverlay
 import android.view.InputDevice
@@ -128,7 +129,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private enum class Screen { CALIBRATION, MENU_TEST, SIGNAL_CHECK }
+private enum class Screen { CALIBRATION, MENU_TEST, SIGNAL_CHECK, GALLERY }
 
 @Composable
 fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
@@ -194,15 +195,22 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
                     when (index) {
                         0 -> screen = Screen.SIGNAL_CHECK
                         1 -> screen = Screen.CALIBRATION
+                        2 -> screen = Screen.GALLERY
                     }
                 },
                 onBack = { screen = Screen.CALIBRATION }
             )
 
+            Screen.GALLERY -> ComponentGallery(
+                source = emulator,
+                profile = profile,
+                onBack = { screen = Screen.MENU_TEST }
+            )
+
             Screen.SIGNAL_CHECK -> SignalCheckScreen(
                 source = emulator,
                 profile = profile,
-                onExit = { screen = Screen.CALIBRATION }
+                onExit = { screen = Screen.MENU_TEST }
             )
         }
 
@@ -244,7 +252,7 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
 }
 
 /**
- * ВРЕМЕННЫЙ экран для проверки MenuNavigator, пока нет настоящего меню (блоки 3–7).
+ * ВРЕМЕННЫЙ экран для проверки MenuNavigator
  *
  * Новичок: короткий сигнал любой мышцей — следующий пункт, удержание — выбрать.
  * Опытный: короткий С — вниз, короткий Р — вверх, удержание С — выбрать, удержание Р — назад.
@@ -256,7 +264,7 @@ private fun MenuTestScreen(
     onOpen: (Int) -> Unit,
     onBack: () -> Unit
 ) {
-    val items = listOf("Проверка сигнала", "Калибровка заново", "Пункт-заглушка")
+    val items = listOf("Проверка сигнала", "Калибровка заново", "Витрина компонентов")
     val navigator = remember(profile) { MenuNavigator(items.size, profile.level) }
     val processor = remember(profile) { SignalProcessor(profile) }
     val detector = remember(profile) { HoldDetector(profile.minPulseMs, profile.holdToSelectMs) }

@@ -32,3 +32,25 @@ val Typography = Typography(
     )
     */
 )
+
+/**
+ * Размеры текста «Мой дом».
+ */
+object HomeType {
+    val Display = 38.sp        // главный заголовок результата: «Готово!»
+    val DisplayLine = 44.sp
+
+    val Title = 32.sp          // заголовок экрана
+    val TitleLine = 38.sp
+
+    val Heading = 24.sp        // пункт меню, заголовок окна, крупные числа
+    val HeadingLine = 30.sp
+
+    val Body = 20.sp           // основной текст, пояснения
+    val BodyLine = 27.sp
+
+    val Label = 18.sp          // подписи под пунктами, шапка экрана, подсказки
+    val LabelLine = 24.sp
+
+    val Caption = 16.sp        // самый мелкий текст: подписи к столбикам, служебное
+}

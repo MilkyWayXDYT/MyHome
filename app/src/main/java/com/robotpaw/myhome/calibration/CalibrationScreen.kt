@@ -174,7 +174,7 @@ private fun StepHeader(phase: CalibrationPhase) {
                     Modifier
                         .size(width = 22.dp, height = 6.dp)
                         .clip(RoundedCornerShape(3.dp))
-                        .background(if (i <= phase.stepIndex || done) HomeColors.Flexor else HomeColors.Divider)
+                        .background(if (i <= phase.stepIndex || done) HomeColors.Accent else HomeColors.Divider)
                 )
             }
         }
@@ -489,7 +489,7 @@ private fun BottomProgress(left: String, right: String, progress: Float) {
                 Modifier
                     .fillMaxWidth(progress.coerceIn(0f, 1f))
                     .height(10.dp)
-                    .background(HomeColors.Flexor)
+                    .background(HomeColors.Accent)
             )
         }
     }
@@ -511,7 +511,7 @@ private fun HoldOption(
             .clip(RoundedCornerShape(18.dp))
             .background(HomeColors.Card)
             .then(
-                if (highlighted) Modifier.border(3.dp, HomeColors.Flexor, RoundedCornerShape(18.dp))
+                if (highlighted) Modifier.border(3.dp, HomeColors.Accent, RoundedCornerShape(18.dp))
                 else Modifier
             )
             .padding(horizontal = 16.dp, vertical = 12.dp),
