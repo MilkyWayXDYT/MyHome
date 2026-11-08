@@ -10,7 +10,27 @@ enum class MissionKind(val label: String) {
     PICTURE("Картина"),
     PILLOWS("Подушки"),
     VACUUM("Пылесос"),
-    FLOWER("Цветочек")
+    FLOWER("Цветочек"),
+
+    // ванная
+    TOOTHBRUSH("Зубная щётка"),
+    TOWEL("Полотенце"),
+    MIRROR("Зеркало"),
+    LAUNDRY("Стирка"),
+    CLOTHESPINS("Прищепки"),
+
+    // кухня
+    TRASH("Мусор"),
+    TABLE("Стол"),
+    TEA("Чай"),
+    SALAD("Салат"),
+    PANCAKES("Блинчики"),
+
+    // финал
+    PET_CHOICE("Питомец"),
+    PET_TOY("Игрушка"),
+    PET_BOWL("Миска"),
+    PET_FOOD("Корм")
 }
 
 enum class Difficulty(val label: String) {
@@ -55,5 +75,31 @@ object Missions {
         Mission("living_pillows", MissionKind.PILLOWS, "Разложите подушки", "Диван", "Подушки разложены!", Difficulty.EASY),
         Mission("living_vacuum", MissionKind.VACUUM, "Пропылесосьте", "Ковёр", "Чисто!", Difficulty.MEDIUM),
         Mission("living_flower", MissionKind.FLOWER, "Полейте цветочек", "Полка с цветочком", "Цветочек полит!", Difficulty.MEDIUM)
+    )
+
+    val BATHROOM = listOf(
+        Mission("bath_teeth", MissionKind.TOOTHBRUSH, "Почистите зубы", "Раковина", "Зубы чистые!", Difficulty.EASY),
+        Mission("bath_towel", MissionKind.TOWEL, "Повесьте полотенце", "Крючок", "Полотенце на месте!", Difficulty.MEDIUM),
+        Mission("bath_mirror", MissionKind.MIRROR, "Протрите зеркало", "Зеркало", "Зеркало блестит!", Difficulty.MEDIUM),
+        Mission("bath_laundry", MissionKind.LAUNDRY, "Постирайте вещи", "Стиральная машина", "Вещи постираны!", Difficulty.HARD),
+        Mission(
+            "bath_clothespins", MissionKind.CLOTHESPINS, "Развесьте бельё на прищепки", "Сушилка",
+            "Бельё сушится!", Difficulty.HARD, optional = true
+        )
+    )
+
+    val KITCHEN = listOf(
+        Mission("kitchen_trash", MissionKind.TRASH, "Вынесите мусор", "Мусорное ведро", "Мусор вынесен!", Difficulty.EASY),
+        Mission("kitchen_table", MissionKind.TABLE, "Накройте на стол", "Обеденный стол", "Стол накрыт!", Difficulty.MEDIUM),
+        Mission("kitchen_tea", MissionKind.TEA, "Заварите чай", "Чайник и кружка", "Чай готов!", Difficulty.HARD),
+        Mission("kitchen_salad", MissionKind.SALAD, "Нарежьте салат", "Разделочная доска", "Салат готов!", Difficulty.HARD),
+        Mission("kitchen_pancakes", MissionKind.PANCAKES, "Испеките блинчики", "Плита", "Блинчики готовы!", Difficulty.HARD)
+    )
+
+    val PET = listOf(
+        Mission("pet_choice", MissionKind.PET_CHOICE, "Выберите питомца", "Коврик у двери", "Знакомьтесь!"),
+        Mission("pet_toy", MissionKind.PET_TOY, "Подарите игрушку", "Корзинка с игрушками", "Питомец играет!"),
+        Mission("pet_bowl", MissionKind.PET_BOWL, "Поставьте миску", "Уголок питомца", "Миска на месте!"),
+        Mission("pet_food", MissionKind.PET_FOOD, "Насыпьте корм", "Миска", "Питомец сыт!")
     )
 }
