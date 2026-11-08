@@ -25,7 +25,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.lifecycle.lifecycleScope
 import com.robotpaw.myhome.calibration.CalibrationScreen
 import com.robotpaw.myhome.emulator.EmulatorSignalSource
-import com.robotpaw.myhome.home.SignalCheckScreen
+import com.robotpaw.myhome.developer.SignalCheckScreen
 import com.robotpaw.myhome.signal.Channel
 import com.robotpaw.myhome.signal.SignalProcessor
 import com.robotpaw.myhome.signal.SignalProfile

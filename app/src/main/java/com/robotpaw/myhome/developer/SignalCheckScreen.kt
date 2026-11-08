@@ -1,4 +1,4 @@
-package com.robotpaw.myhome.home
+package com.robotpaw.myhome.developer
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
