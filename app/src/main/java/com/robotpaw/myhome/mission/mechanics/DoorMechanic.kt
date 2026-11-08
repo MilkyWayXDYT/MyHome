@@ -27,12 +27,6 @@ import com.robotpaw.myhome.ui.theme.HomeType
 // если за это время дверь не открылась - показываем окно поддержки
 private const val ATTEMPT_LIMIT_MS = 20_000L
 
-// время текущей попытки и флаг «уже вызвали onDone/onPause», чтобы не вызвать дважды
-private class Attempt {
-    var ms = 0L
-    var finished = false
-}
-
 /**
  * Задание «Дверь» (обучение): сжать кисть и держать
  * @param checkpoint - откуда продолжаем (после окна поддержки)
@@ -52,7 +46,7 @@ fun DoorMechanic(
     val rules = remember { DoorRules().apply { restore(checkpoint.progress) } }
     val recorder = remember { MissionRecorder(checkpoint.log) }
     var progress by remember { mutableFloatStateOf(checkpoint.progress) }
-    val attempt = remember { Attempt() }
+    val attempt = remember { MechanicAttempt() }
 
     val input = rememberMechanicInput(source, profile) { state, dt ->
         if (attempt.finished) return@rememberMechanicInput

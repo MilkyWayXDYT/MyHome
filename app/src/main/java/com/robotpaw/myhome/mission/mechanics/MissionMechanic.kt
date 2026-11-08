@@ -8,14 +8,24 @@ import com.robotpaw.myhome.game.MissionLog
 import com.robotpaw.myhome.signal.SignalProfile
 import com.robotpaw.myhome.signal.SignalSource
 
+/**
+ * Какие задания уже имеют настоящую механику (остальные идут через заглушку в MissionScreen)
+ * Сделали механику - добавьте вид сюда и ветку в MissionMechanic
+ */
 object Mechanics {
     val implemented: Set<MissionKind> = setOf(
-        MissionKind.DOOR
+        MissionKind.DOOR,
+        MissionKind.PICTURE,
+        MissionKind.PILLOWS
     )
 
     fun has(kind: MissionKind): Boolean = kind in implemented
 }
 
+/**
+ * Выбирает механику по виду задания. Контракт у всех механик одинаковый:
+ * слушает сигнал, по завершении вызывает onDone с логом, когда игроку нужна пауза - onPause с чекпоинтом
+ */
 @Composable
 fun MissionMechanic(
     source: SignalSource,
@@ -28,6 +38,12 @@ fun MissionMechanic(
 ) {
     when (mission.kind) {
         MissionKind.DOOR -> DoorMechanic(source, profile, roomTitle, mission, checkpoint, onDone, onPause)
+        MissionKind.PICTURE -> AlternationMechanic(
+            source, profile, roomTitle, mission, AlternationConfigs.PICTURE, checkpoint, onDone, onPause
+        )
+        MissionKind.PILLOWS -> AlternationMechanic(
+            source, profile, roomTitle, mission, AlternationConfigs.PILLOWS, checkpoint, onDone, onPause
+        )
         else -> Unit
     }
 }

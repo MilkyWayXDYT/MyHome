@@ -2,8 +2,8 @@ package com.robotpaw.myhome.mission.mechanics
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -12,7 +12,18 @@ import com.robotpaw.myhome.signal.SignalProfile
 import com.robotpaw.myhome.signal.SignalSource
 import com.robotpaw.myhome.signal.SignalState
 
+// кадр длиннее считаем разрывом (пауза, свёрнутое приложение), чтобы он не засчитался как время игры
 private const val MAX_DT_MS = 100L
+
+/**
+ * Текущая попытка задания, общая для всех механик
+ * @param ms - сколько времени идёт попытка (по кадрам)
+ * @param finished - уже вызвали onDone или onPause, чтобы не вызвать повторно
+ */
+class MechanicAttempt {
+    var ms = 0L
+    var finished = false
+}
 
 /**
  * То, что механика показывает на экране
@@ -43,7 +54,7 @@ fun rememberMechanicInput(
 
     LaunchedEffect(source, processor) {
         var lastTimestamp = -1L
-        source.frames.collect {frame ->
+        source.frames.collect { frame ->
             val state = processor.process(frame)
             input.state = state
 
