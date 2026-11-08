@@ -22,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -42,6 +43,8 @@ import androidx.compose.ui.unit.sp
 import com.robotpaw.myhome.signal.Channel
 import com.robotpaw.myhome.signal.ControlEvent
 import com.robotpaw.myhome.signal.HoldDetector
+import com.robotpaw.myhome.signal.MenuAction
+import com.robotpaw.myhome.signal.MenuNavigator
 import com.robotpaw.myhome.signal.SignalData
 import com.robotpaw.myhome.signal.SignalProcessor
 import com.robotpaw.myhome.signal.SignalProfile
@@ -73,9 +76,13 @@ fun CalibrationScreen(
     var frame by remember { mutableStateOf(source.frames.value) }
     var holdProgress by remember { mutableFloatStateOf(0f) }
     var holdChannel by remember { mutableStateOf<Channel?>(null) }
+    // Итоговый экран: какой из двух пунктов подсвечен и как ими управлять (новичок / опытный).
+    var selectedOption by remember { mutableIntStateOf(0) }
+    var resultLevel by remember { mutableStateOf(UserLevel.NOVICE) }
 
     LaunchedEffect(source) {
         var processor: SignalProcessor? = null
+        var navigator: MenuNavigator? = null
         source.frames.collect { f ->
             frame = f
             val p = controller.onFrame(f)
@@ -83,6 +90,7 @@ fun CalibrationScreen(
 
             if (p !is CalibrationPhase.Finished) {
                 processor = null
+                navigator = null
                 return@collect
             }
 
@@ -92,23 +100,40 @@ fun CalibrationScreen(
                 processor = it
                 holdDetector.reset()
             }
+            // Не вышло — управляем как новичок: так проще всего выбрать пункт.
+            val level = p.result.profile?.level ?: UserLevel.NOVICE
+            val nav = navigator ?: MenuNavigator(itemCount = 2, level = level).also {
+                navigator = it
+                resultLevel = level
+                selectedOption = 0
+            }
+
             val event = holdDetector.update(interp.process(f))
             holdProgress = holdDetector.progress
             holdChannel = holdDetector.progressChannel
+            if (event == null) return@collect
 
-            if (event is ControlEvent.Hold) {
-                val success = p.result.profile
-                when {
-                    success != null && event.channel == Channel.FLEXOR -> currentOnFinished(success)
-                    success == null && event.channel == Channel.EXTENSOR -> currentOnFinished(SignalProfile())
-                    else -> {
-                        controller.restart()
-                        phase = controller.phase
-                    }
-                }
-                holdProgress = 0f
-                holdChannel = null
+            // Новичок: короткий сигнал — переключить пункт, удержание любой мышцей — выбрать подсвеченный.
+            // Опытный: удержание С — первый пункт, удержание Р — второй, как раньше.
+            val option = if (level == UserLevel.NOVICE) {
+                (nav.onEvent(event) as? MenuAction.Select)?.index
+            } else {
+                (event as? ControlEvent.Hold)?.let { if (it.channel == Channel.FLEXOR) 0 else 1 }
             }
+            selectedOption = nav.selected
+            if (option == null) return@collect
+
+            val success = p.result.profile
+            when {
+                success != null && option == 0 -> currentOnFinished(success)
+                success == null && option == 1 -> currentOnFinished(SignalProfile())
+                else -> {
+                    controller.restart()
+                    phase = controller.phase
+                }
+            }
+            holdProgress = 0f
+            holdChannel = null
         }
     }
 
@@ -122,7 +147,7 @@ fun CalibrationScreen(
     ) {
         StepHeader(phase)
         when (val p = phase) {
-            is CalibrationPhase.Finished -> FinishedContent(p.result, frame, holdChannel, holdProgress)
+            is CalibrationPhase.Finished -> FinishedContent(p.result, frame, holdChannel, holdProgress, resultLevel, selectedOption)
             else -> StepContent(p, frame)
         }
     }
@@ -229,9 +254,26 @@ private fun androidx.compose.foundation.layout.ColumnScope.FinishedContent(
     result: CalibrationResult,
     frame: SignalData,
     holdChannel: Channel?,
-    holdProgress: Float
+    holdProgress: Float,
+    level: UserLevel,
+    selectedOption: Int
 ) {
     val profile = result.profile
+    val novice = level == UserLevel.NOVICE
+    // Новичок: подсвечен выбранный пункт, кольцо заполняется удержанием любой мышцы.
+    // Опытный: у каждого пункта своя мышца, подсвечен основной.
+    fun progressOf(index: Int, channel: Channel): Float = when {
+        novice -> if (index == selectedOption && holdChannel != null) holdProgress else 0f
+        else -> if (holdChannel == channel) holdProgress else 0f
+    }
+    fun highlightedOf(index: Int) = if (novice) index == selectedOption else index == 0
+    // Цвет кольца: у новичка — цвет мышцы, которую сейчас держат.
+    fun ringOf(channel: Channel) = if (novice) (holdChannel ?: Channel.FLEXOR) else channel
+    fun hintOf(channel: Channel) = when {
+        novice -> "короткий сигнал — переключить, удержание — выбрать"
+        channel == Channel.FLEXOR -> "держите С"
+        else -> "держите Р"
+    }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(
             text = if (profile != null) "Готово!" else "Не получилось",
@@ -261,33 +303,33 @@ private fun androidx.compose.foundation.layout.ColumnScope.FinishedContent(
     if (profile != null) {
         ResultSummary(result, profile)
         HoldOption(
-            channel = Channel.FLEXOR,
+            channel = ringOf(Channel.FLEXOR),
             title = "Продолжить",
-            hint = "держите С",
-            progress = if (holdChannel == Channel.FLEXOR) holdProgress else 0f,
-            highlighted = true
+            hint = hintOf(Channel.FLEXOR),
+            progress = progressOf(0, Channel.FLEXOR),
+            highlighted = highlightedOf(0)
         )
         HoldOption(
-            channel = Channel.EXTENSOR,
+            channel = ringOf(Channel.EXTENSOR),
             title = "Пройти ещё раз",
-            hint = "держите Р",
-            progress = if (holdChannel == Channel.EXTENSOR) holdProgress else 0f,
-            highlighted = false
+            hint = hintOf(Channel.EXTENSOR),
+            progress = progressOf(1, Channel.EXTENSOR),
+            highlighted = highlightedOf(1)
         )
     } else {
         HoldOption(
-            channel = Channel.FLEXOR,
+            channel = ringOf(Channel.FLEXOR),
             title = "Попробовать ещё раз",
-            hint = "держите С",
-            progress = if (holdChannel == Channel.FLEXOR) holdProgress else 0f,
-            highlighted = true
+            hint = hintOf(Channel.FLEXOR),
+            progress = progressOf(0, Channel.FLEXOR),
+            highlighted = highlightedOf(0)
         )
         HoldOption(
-            channel = Channel.EXTENSOR,
+            channel = ringOf(Channel.EXTENSOR),
             title = "Пропустить, стандартные пороги",
-            hint = "держите Р",
-            progress = if (holdChannel == Channel.EXTENSOR) holdProgress else 0f,
-            highlighted = false
+            hint = hintOf(Channel.EXTENSOR),
+            progress = progressOf(1, Channel.EXTENSOR),
+            highlighted = highlightedOf(1)
         )
     }
 }

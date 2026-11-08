@@ -28,6 +28,20 @@ import com.robotpaw.myhome.home.SignalCheckScreen
 import com.robotpaw.myhome.signal.Channel
 import com.robotpaw.myhome.signal.SignalProcessor
 import com.robotpaw.myhome.signal.SignalProfile
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
+import com.robotpaw.myhome.signal.ControlEvent
+import com.robotpaw.myhome.signal.HoldDetector
+import com.robotpaw.myhome.signal.MenuAction
+import com.robotpaw.myhome.signal.MenuNavigator
+import com.robotpaw.myhome.signal.SignalSource
+import com.robotpaw.myhome.signal.UserLevel
+import com.robotpaw.myhome.ui.theme.HomeColors
 import kotlin.math.roundToInt
 
 class MainActivity : ComponentActivity() {
@@ -114,7 +128,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private enum class Screen { CALIBRATION, SIGNAL_CHECK }
+private enum class Screen { CALIBRATION, MENU_TEST, SIGNAL_CHECK }
 
 @Composable
 fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
@@ -169,14 +183,26 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
                 source = emulator,
                 onFinished = {
                     profile = it
-                    screen = Screen.SIGNAL_CHECK
+                    screen = Screen.MENU_TEST
                 }
+            )
+
+            Screen.MENU_TEST -> MenuTestScreen(
+                source = emulator,
+                profile = profile,
+                onOpen = { index ->
+                    when (index) {
+                        0 -> screen = Screen.SIGNAL_CHECK
+                        1 -> screen = Screen.CALIBRATION
+                    }
+                },
+                onBack = { screen = Screen.CALIBRATION }
             )
 
             Screen.SIGNAL_CHECK -> SignalCheckScreen(
                 source = emulator,
                 profile = profile,
-                onRecalibrate = { screen = Screen.CALIBRATION }
+                onExit = { screen = Screen.CALIBRATION }
             )
         }
 
@@ -214,5 +240,95 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
                     )
             )
         }
+    }
+}
+
+/**
+ * ВРЕМЕННЫЙ экран для проверки MenuNavigator, пока нет настоящего меню (блоки 3–7).
+ *
+ * Новичок: короткий сигнал любой мышцей — следующий пункт, удержание — выбрать.
+ * Опытный: короткий С — вниз, короткий Р — вверх, удержание С — выбрать, удержание Р — назад.
+ */
+@Composable
+private fun MenuTestScreen(
+    source: SignalSource,
+    profile: SignalProfile,
+    onOpen: (Int) -> Unit,
+    onBack: () -> Unit
+) {
+    val items = listOf("Проверка сигнала", "Калибровка заново", "Пункт-заглушка")
+    val navigator = remember(profile) { MenuNavigator(items.size, profile.level) }
+    val processor = remember(profile) { SignalProcessor(profile) }
+    val detector = remember(profile) { HoldDetector(profile.minPulseMs, profile.holdToSelectMs) }
+    val currentOnOpen by rememberUpdatedState(onOpen)
+    val currentOnBack by rememberUpdatedState(onBack)
+
+    var selected by remember { mutableIntStateOf(0) }
+    var holdProgress by remember { mutableFloatStateOf(0f) }
+    var lastEvent by remember { mutableStateOf("пока ничего") }
+
+    LaunchedEffect(source, navigator) {
+        source.frames.collect { frame ->
+            val event = detector.update(processor.process(frame))
+            holdProgress = detector.progress
+            if (event == null) return@collect
+
+            val action = navigator.onEvent(event)
+            selected = navigator.selected
+            lastEvent = when (event) {
+                is ControlEvent.Pulse -> "короткий ${if (event.channel == Channel.FLEXOR) "С" else "Р"}"
+                is ControlEvent.Hold -> "удержание ${if (event.channel == Channel.FLEXOR) "С" else "Р"}"
+            }
+            when (action) {
+                is MenuAction.Select -> {
+                    lastEvent += " → выбран «${items[action.index]}»"
+                    currentOnOpen(action.index)
+                }
+                MenuAction.Back -> currentOnBack()
+                null -> Unit
+            }
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(HomeColors.Background)
+            .statusBarsPadding()
+            .padding(24.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text("Проверка меню", fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = HomeColors.Ink)
+        Text(
+            if (profile.level == UserLevel.NOVICE)
+                "Режим: новичок. Короткий сигнал любой мышцей — следующий пункт, удержание — выбрать."
+            else
+                "Режим: опытный. Короткий С — вниз, Р — вверх. Удержание С — выбрать, удержание Р — назад (к калибровке).",
+            fontSize = 15.sp, color = HomeColors.InkSecondary
+        )
+
+        items.forEachIndexed { index, title ->
+            val isSelected = index == selected
+            val shape = RoundedCornerShape(18.dp)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(shape)
+                    .background(HomeColors.Card)
+                    .then(if (isSelected) Modifier.border(3.dp, HomeColors.Flexor, shape) else Modifier)
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    title, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = HomeColors.Ink,
+                    modifier = Modifier.weight(1f)
+                )
+                if (isSelected && holdProgress > 0f) {
+                    Text("${(holdProgress * 100).roundToInt()}%", fontSize = 15.sp, color = HomeColors.Flexor)
+                }
+            }
+        }
+
+        Text("Последнее событие: $lastEvent", fontSize = 15.sp, color = HomeColors.Ink)
     }
 }

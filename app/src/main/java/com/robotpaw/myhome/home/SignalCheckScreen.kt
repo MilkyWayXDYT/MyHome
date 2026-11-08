@@ -43,20 +43,20 @@ import com.robotpaw.myhome.ui.theme.HomeColors
  * Временный экран после калибровки
  *
  * Показывает код состояния и ловит короткие сигналы / удержания так, как это будет в меню.
- * Удержание Р — вернуться к калибровке.
+ * Удержание Р — вернуться в главное меню.
  */
 @Composable
 fun SignalCheckScreen(
     source: SignalSource,
     profile: SignalProfile,
-    onRecalibrate: () -> Unit,
+    onExit: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val processor = remember(profile) { SignalProcessor(profile) }
     val detector = remember(profile) {
         HoldDetector(minPulseMs = profile.minPulseMs, holdMs = profile.holdToSelectMs)
     }
-    val currentOnRecalibrate by rememberUpdatedState(onRecalibrate)
+    val currentOnExit by rememberUpdatedState(onExit)
 
     var state by remember { mutableStateOf(SignalState.EMPTY) }
     val events = remember { mutableStateListOf<String>() }
@@ -69,7 +69,7 @@ fun SignalCheckScreen(
                 is ControlEvent.Pulse -> events.add(0, "Короткий ${letter(e.channel)}")
                 is ControlEvent.Hold -> {
                     events.add(0, "Удержание ${letter(e.channel)}")
-                    if (e.channel == Channel.EXTENSOR) currentOnRecalibrate()
+                    if (e.channel == Channel.EXTENSOR) currentOnExit()
                 }
                 null -> Unit
             }
@@ -87,7 +87,7 @@ fun SignalCheckScreen(
     ) {
         Text("Проверка сигнала", fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = HomeColors.Ink)
         Text(
-            "Временный экран. Короткий сигнал — шаг в меню, удержание — выбор. Удержание Р — заново калибровка.",
+            "Временный экран. Короткий сигнал — шаг в меню, удержание — выбор. Удержание Р — в меню.",
             fontSize = 15.sp, color = HomeColors.InkSecondary
         )
 
