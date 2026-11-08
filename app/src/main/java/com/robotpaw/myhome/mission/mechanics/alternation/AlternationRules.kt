@@ -1,4 +1,4 @@
-package com.robotpaw.myhome.mission.mechanics
+package com.robotpaw.myhome.mission.mechanics.alternation
 
 import com.robotpaw.myhome.signal.Channel
 import com.robotpaw.myhome.signal.SignalState

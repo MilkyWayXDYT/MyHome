@@ -1,4 +1,4 @@
-package com.robotpaw.myhome.mission.mechanics
+package com.robotpaw.myhome.mission.mechanics.core
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect

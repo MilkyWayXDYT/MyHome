@@ -1,6 +1,6 @@
 package com.robotpaw.myhome.mission
 
-import com.robotpaw.myhome.mission.mechanics.DoorRules
+import com.robotpaw.myhome.mission.mechanics.door.DoorRules
 import com.robotpaw.myhome.signal.SignalState
 import com.robotpaw.myhome.signal.calculateSignalState
 import org.junit.Assert.assertEquals

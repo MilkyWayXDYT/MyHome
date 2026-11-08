@@ -1,7 +1,7 @@
 package com.robotpaw.myhome.mission
 
-import com.robotpaw.myhome.mission.mechanics.AlternationRules
-import com.robotpaw.myhome.mission.mechanics.AlternationStep
+import com.robotpaw.myhome.mission.mechanics.alternation.AlternationRules
+import com.robotpaw.myhome.mission.mechanics.alternation.AlternationStep
 import com.robotpaw.myhome.signal.Channel
 import com.robotpaw.myhome.signal.calculateSignalState
 import org.junit.Assert.assertEquals

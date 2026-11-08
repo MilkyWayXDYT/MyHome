@@ -1,4 +1,4 @@
-package com.robotpaw.myhome.mission.mechanics
+package com.robotpaw.myhome.mission.mechanics.door
 
 import com.robotpaw.myhome.signal.SignalState
 

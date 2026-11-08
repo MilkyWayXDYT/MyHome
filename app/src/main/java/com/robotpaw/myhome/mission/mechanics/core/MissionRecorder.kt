@@ -1,4 +1,4 @@
-package com.robotpaw.myhome.mission.mechanics
+package com.robotpaw.myhome.mission.mechanics.core
 
 import com.robotpaw.myhome.game.MissionLog
 import com.robotpaw.myhome.signal.Channel

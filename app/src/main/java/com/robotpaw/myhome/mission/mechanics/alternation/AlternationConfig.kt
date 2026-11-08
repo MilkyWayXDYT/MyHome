@@ -1,4 +1,4 @@
-package com.robotpaw.myhome.mission.mechanics
+package com.robotpaw.myhome.mission.mechanics.alternation
 
 import com.robotpaw.myhome.signal.Channel
 
@@ -20,7 +20,12 @@ object AlternationConfigs {
             AlternationStep(Channel.FLEXOR, 1200L, "Сожмите кисть: возьмите картину"),
             AlternationStep(Channel.EXTENSOR, 1200L, "Разожмите кисть: поднимите к крючку"),
             AlternationStep(Channel.FLEXOR, 1200L, "Сожмите кисть: поймайте крючок"),
-            AlternationStep(Channel.EXTENSOR, 1500L, "Разожмите мягко: отпустите картину", zone = 20..70)
+            AlternationStep(
+                Channel.EXTENSOR,
+                1500L,
+                "Разожмите мягко: отпустите картину",
+                zone = 20..70
+            )
         ),
         attemptLimitMs = 30_000L
     )

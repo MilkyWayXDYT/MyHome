@@ -1,10 +1,9 @@
-package com.robotpaw.myhome.mission.mechanics
+package com.robotpaw.myhome.mission.mechanics.door
 
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -14,6 +13,9 @@ import com.robotpaw.myhome.game.Mission
 import com.robotpaw.myhome.game.MissionCheckpoint
 import com.robotpaw.myhome.game.MissionLog
 import com.robotpaw.myhome.mission.MissionObject
+import com.robotpaw.myhome.mission.mechanics.core.MechanicAttempt
+import com.robotpaw.myhome.mission.mechanics.core.MissionRecorder
+import com.robotpaw.myhome.mission.mechanics.core.rememberMechanicInput
 import com.robotpaw.myhome.signal.Channel
 import com.robotpaw.myhome.signal.SignalProfile
 import com.robotpaw.myhome.signal.SignalSource
@@ -25,85 +27,72 @@ import com.robotpaw.myhome.ui.components.WarningLine
 import com.robotpaw.myhome.ui.theme.HomeColors
 import com.robotpaw.myhome.ui.theme.HomeType
 
+// если за это время дверь не открылась - показываем окно поддержки
+private const val ATTEMPT_LIMIT_MS = 20_000L
+
 /**
- * Общая механика для заданий на чередование сгибания и разгибания (картина, подушки)
- * Правила и тексты берутся из config, поэтому для нового задания такого типа достаточно нового config
+ * Задание «Дверь» (обучение): сжать кисть и держать
  * @param checkpoint - откуда продолжаем (после окна поддержки)
- * @param onDone - задание выполнено, лог для экрана результата
+ * @param onDone - дверь открыта, лог для экрана результата
  * @param onPause - нужна пауза; в первый раз прогресс сохраняется, потом начинается заново
  */
 @Composable
-fun AlternationMechanic(
+fun DoorMechanic(
     source: SignalSource,
     profile: SignalProfile,
     roomTitle: String,
     mission: Mission,
-    config: AlternationConfig,
     checkpoint: MissionCheckpoint,
     onDone: (MissionLog) -> Unit,
     onPause: (MissionCheckpoint) -> Unit
 ) {
-    val rules = remember { AlternationRules(config.steps).apply { restore(checkpoint.progress) } }
+    val rules = remember { DoorRules().apply { restore(checkpoint.progress) } }
     val recorder = remember { MissionRecorder(checkpoint.log) }
+    var progress by remember { mutableFloatStateOf(checkpoint.progress) }
     val attempt = remember { MechanicAttempt() }
-
-    var total by remember { mutableFloatStateOf(rules.progress) }
-    var stepProgress by remember { mutableFloatStateOf(rules.stepProgress) }
-    var stepIndex by remember { mutableIntStateOf(rules.stepIndex) }
 
     val input = rememberMechanicInput(source, profile) { state, dt ->
         if (attempt.finished) return@rememberMechanicInput
 
-        recorder.onFrame(state, dt, rules.current?.channel)
-        val event = rules.update(state, dt)
-        if (event.overshoot) recorder.addError()
-
-        total = rules.progress
-        stepProgress = rules.stepProgress
-        stepIndex = rules.stepIndex
+        recorder.onFrame(state, dt, Channel.FLEXOR)
+        val opened = rules.update(state, dt)
+        progress = rules.progress
         attempt.ms += dt
 
-        if (rules.isDone) {
+        if (opened) {
             attempt.finished = true
             onDone(recorder.snapshot())
-        } else if (attempt.ms >= config.attemptLimitMs) {
+        } else if (attempt.ms >= ATTEMPT_LIMIT_MS) {
             attempt.finished = true
             val firstTime = recorder.snapshot().pauses == 0
             recorder.addPause()
-            onPause(MissionCheckpoint(progress = if (firstTime) rules.progress else 0f, log = recorder.snapshot()))
+            onPause(
+                MissionCheckpoint(
+                    progress = if (firstTime) rules.progress else 0f,
+                    log = recorder.snapshot()
+                )
+            )
         }
     }
     val state = input.state
-    val step = config.steps.getOrNull(stepIndex)
 
     HomeScreen(
         title = mission.title,
         overline = "$roomTitle · задание"
     ) {
-        MissionObject(mission.kind, progress = total, modifier = Modifier.weight(1f))
+        MissionObject(mission.kind, progress = progress, modifier = Modifier.weight(1f))
+        ProgressStrip(progress, HomeColors.Flexor, height = 16.dp)
         HomeCard {
             Text(
-                "Шаг ${(stepIndex + 1).coerceAtMost(config.steps.size)} из ${config.steps.size}",
-                fontSize = HomeType.Label, color = HomeColors.InkSecondary
-            )
-            Text(
-                if (!input.armed) "Расслабьте руку" else step?.text ?: "Готово",
+                when {
+                    !input.armed -> "Расслабьте руку"
+                    state.isFlexorActive && !state.isExtensorActive -> "Так, держите"
+                    else -> "Сожмите кисть и держите"
+                },
                 fontSize = HomeType.Heading, fontWeight = FontWeight.ExtraBold, color = HomeColors.Ink
             )
         }
-        ProgressStrip(
-            stepProgress,
-            if (step?.channel == Channel.EXTENSOR) HomeColors.Extensor else HomeColors.Flexor,
-            height = 16.dp
-        )
-        WarningLine(
-            when {
-                !input.armed -> null
-                state.isCoContraction -> "Напряжены оба канала. Оставьте только нужный"
-                rules.isOvershooting -> "Слишком сильно. Ослабьте нажим"
-                else -> null
-            }
-        )
+        WarningLine(if (input.armed && state.isCoContraction) "Напряжены оба канала. Отпустите разгибатель" else null)
         SignalBars(state)
     }
 }

@@ -1,6 +1,6 @@
 package com.robotpaw.myhome.mission
 
-import com.robotpaw.myhome.mission.mechanics.MissionRecorder
+import com.robotpaw.myhome.mission.mechanics.core.MissionRecorder
 import com.robotpaw.myhome.signal.Channel
 import com.robotpaw.myhome.signal.calculateSignalState
 import org.junit.Assert.assertEquals
