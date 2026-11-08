@@ -61,7 +61,7 @@ class CalibrationControllerTest {
 
     @Test
     fun walksAllStepsAndFinishes() {
-        val controller = CalibrationController(prepareMs = 100, recordMs = 200, reactionMs = 0)
+        val controller = CalibrationController(prepareMs = 100, recordMs = 200, reactionMs = 0, requireConfirm = false, stepDoneMs = 0)
         var t = 0L
         fun feed(ms: Long, f: Int, e: Int) {
             val end = t + ms
@@ -82,7 +82,7 @@ class CalibrationControllerTest {
 
     @Test
     fun recordingPauses_whenUserLetsGo() {
-        val controller = CalibrationController(prepareMs = 100, recordMs = 1000, reactionMs = 0)
+        val controller = CalibrationController(prepareMs = 100, recordMs = 1000, reactionMs = 0, requireConfirm = false, stepDoneMs = 0)
         var t = 0L
         fun feed(ms: Long, f: Int, e: Int) {
             val end = t + ms
@@ -102,7 +102,7 @@ class CalibrationControllerTest {
 
     @Test
     fun frameGap_doesNotSkipRecording() {
-        val controller = CalibrationController(prepareMs = 100, recordMs = 3000, reactionMs = 0)
+        val controller = CalibrationController(prepareMs = 100, recordMs = 3000, reactionMs = 0, requireConfirm = false, stepDoneMs = 0)
         controller.onFrame(SignalData(0, 5, 5))
         controller.onFrame(SignalData(100, 5, 5))      // отсчёт закончился
         controller.onFrame(SignalData(5_000, 5, 5))    // телефон «подвис» на 5 секунд
@@ -112,7 +112,7 @@ class CalibrationControllerTest {
 
     @Test
     fun weakSignal_finishesByTimeoutInsteadOfHanging() {
-        val controller = CalibrationController(prepareMs = 100, recordMs = 500, reactionMs = 0, stepTimeoutMs = 2000)
+        val controller = CalibrationController(prepareMs = 100, recordMs = 500, reactionMs = 0, stepTimeoutMs = 2000, requireConfirm = false, stepDoneMs = 0)
         var t = 0L
         while (t < 10_000 && controller.phase !is CalibrationPhase.Finished) {
             controller.onFrame(SignalData(t, 5, 5))   // ни сжатия, ни раскрытия
@@ -127,7 +127,7 @@ class CalibrationControllerTest {
 
     @Test
     fun spikes_doNotAdvanceRecording() {
-        val controller = CalibrationController(prepareMs = 100, recordMs = 1000, reactionMs = 300)
+        val controller = CalibrationController(prepareMs = 100, recordMs = 1000, reactionMs = 300, requireConfirm = false, stepDoneMs = 0)
         var t = 0L
         fun frame(f: Int, e: Int) {
             controller.onFrame(SignalData(t, f, e))
@@ -144,7 +144,7 @@ class CalibrationControllerTest {
 
     @Test
     fun shortDropout_doesNotBreakHold() {
-        val controller = CalibrationController(prepareMs = 100, recordMs = 1000, reactionMs = 300)
+        val controller = CalibrationController(prepareMs = 100, recordMs = 1000, reactionMs = 300, requireConfirm = false, stepDoneMs = 0)
         var t = 0L
         fun frame(f: Int, e: Int) {
             controller.onFrame(SignalData(t, f, e))
@@ -158,5 +158,35 @@ class CalibrationControllerTest {
         val after = controller.phase as CalibrationPhase.Recording
         assertTrue(after.isHolding)
         assertTrue(after.progress > before) // запись продолжилась без новой паузы на реакцию
+    }
+
+    @Test
+    fun intro_waitsForConfirm_beforeEachStep() {
+        val controller = CalibrationController(prepareMs = 100, recordMs = 200, reactionMs = 0, stepDoneMs = 0)
+        var t = 0L
+        fun frame(f: Int, e: Int) = controller.onFrame(SignalData(t, f, e)).also { t += 20 }
+
+        repeat(50) { frame(5, 5) }                          // секунда без подтверждения
+        assertTrue(controller.phase is CalibrationPhase.Intro)
+
+        controller.confirm()
+        repeat(20) { frame(5, 5) }                          // отсчёт + запись покоя
+        val next = controller.phase
+        assertTrue(next is CalibrationPhase.Intro)          // перед сжатием — снова окно
+        assertEquals(CalibrationStep.FLEXOR, (next as CalibrationPhase.Intro).step)
+    }
+
+    @Test
+    fun stepDone_pausesBeforeNextStep() {
+        val controller = CalibrationController(prepareMs = 100, recordMs = 200, reactionMs = 0, requireConfirm = false, stepDoneMs = 500)
+        var t = 0L
+        fun frame(f: Int, e: Int) = controller.onFrame(SignalData(t, f, e)).also { t += 20 }
+
+        repeat(16) { frame(5, 5) }                          // отсчёт + запись покоя
+        assertTrue(controller.phase is CalibrationPhase.StepDone)
+        repeat(20) { frame(5, 5) }                          // 0,4 с - ещё пауза
+        assertTrue(controller.phase is CalibrationPhase.StepDone)
+        repeat(5) { frame(5, 5) }                           // пауза закончилась - отсчёт следующего шага
+        assertTrue(controller.phase is CalibrationPhase.Preparing)
     }
 }

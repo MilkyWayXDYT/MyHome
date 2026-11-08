@@ -46,7 +46,6 @@ import com.robotpaw.myhome.ui.theme.HomeColors
 import kotlin.math.roundToInt
 
 class MainActivity : ComponentActivity() {
-    /** Единственный источник сигнала для игры. Позже здесь будет драйвер протеза. */
     private val emulator by lazy { EmulatorSignalSource(lifecycleScope) }
 
     private var isDebug = false
@@ -252,10 +251,7 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
 }
 
 /**
- * ВРЕМЕННЫЙ экран для проверки MenuNavigator
- *
- * Новичок: короткий сигнал любой мышцей — следующий пункт, удержание — выбрать.
- * Опытный: короткий С — вниз, короткий Р — вверх, удержание С — выбрать, удержание Р — назад.
+ * Временный экран для проверки MenuNavigator (уберётся с настоящим меню)
  */
 @Composable
 private fun MenuTestScreen(

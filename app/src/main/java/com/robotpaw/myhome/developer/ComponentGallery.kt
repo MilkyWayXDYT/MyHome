@@ -52,15 +52,8 @@ import com.robotpaw.myhome.ui.theme.HomeColors
 import com.robotpaw.myhome.ui.theme.HomeType
 
 /**
- * Витрина компонентов — только для разработки (debug).
- *
- * Все детали интерфейса на одном экране. Сверху — ползунки и переключатели,
- * чтобы посмотреть каждый компонент в разных состояниях и подобрать размеры и цвета.
- * «Живой сигнал» берёт силу и кольцо удержания из эмулятора: зажмите С / Р справа.
- *
- * Управляется касанием — это инструмент разработчика, а не экран игры.
- *
- * @param source источник сигнала; null — только ручные ползунки (так работает превью в Android Studio).
+ * Витрина компонентов для настройки (только debug, управляется касанием)
+ * @param source - null, только ползунки (для превью)
  */
 @Composable
 fun ComponentGallery(
@@ -78,7 +71,6 @@ fun ComponentGallery(
     var warning by remember { mutableStateOf(false) }
     var live by remember { mutableStateOf(false) }
 
-    // Живой сигнал из эмулятора
     var liveState by remember { mutableStateOf(SignalState.EMPTY) }
     var liveHold by remember { mutableFloatStateOf(0f) }
     var liveHoldChannel by remember { mutableStateOf<Channel?>(null) }
@@ -118,7 +110,6 @@ fun ComponentGallery(
             Button(onClick = onBack) { Text("Назад") }
         }
 
-        // ---- Управление ----
         HomeCard {
             SectionTitle("Параметры")
             LabeledSlider("Прогресс (кольцо, полоса)", progress) { progress = it }
@@ -131,7 +122,6 @@ fun ComponentGallery(
             if (source != null) LabeledSwitch("Живой сигнал из эмулятора", live) { live = it }
         }
 
-        // ---- Компоненты ----
         Section("MenuItemCard — пункт меню") {
             MenuItemCard(
                 title = "Продолжить тренировку",
@@ -238,7 +228,6 @@ fun ComponentGallery(
     }
 }
 
-/** Состояние сигнала из ползунков: порог 30, как стандартный. */
 private fun fakeState(flexor: Int, extensor: Int): SignalState {
     val f = flexor >= 30
     val e = extensor >= 30
@@ -290,7 +279,6 @@ private fun LabeledSwitch(label: String, checked: Boolean, onChange: (Boolean) -
     }
 }
 
-/** Превью в Android Studio: откройте файл и включите Split — витрина появится без запуска. */
 @Preview(widthDp = 390, heightDp = 3200, showBackground = true)
 @Composable
 private fun ComponentGalleryPreview() {

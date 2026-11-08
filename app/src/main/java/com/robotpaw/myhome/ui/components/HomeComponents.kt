@@ -42,10 +42,6 @@ import com.robotpaw.myhome.signal.UserLevel
 import com.robotpaw.myhome.ui.theme.HomeColors
 import com.robotpaw.myhome.ui.theme.HomeType
 
-/*
- * Примитивы интерфейса «Мой дом». Все экраны собираются из них,
- * чтобы размеры и цвета были одинаковыми и совпадали с макетами.
- */
 
 fun channelColor(channel: Channel): Color =
     if (channel == Channel.FLEXOR) HomeColors.Flexor else HomeColors.Extensor
@@ -53,7 +49,10 @@ fun channelColor(channel: Channel): Color =
 fun channelLetter(channel: Channel): String =
     if (channel == Channel.FLEXOR) "С" else "Р"
 
-/** Каркас экрана: фон, отступы, заголовок сверху, подсказки управления снизу. */
+/**
+ * Каркас экрана
+ * @param bottom - закреплено внизу (обычно подсказки управления)
+ */
 @Composable
 fun HomeScreen(
     title: String,
@@ -93,7 +92,6 @@ fun HomeScreen(
     }
 }
 
-/** Белая карточка со скруглением. */
 @Composable
 fun HomeCard(
     modifier: Modifier = Modifier,
@@ -113,7 +111,6 @@ fun HomeCard(
     )
 }
 
-/** Кружок с буквой канала: С синий, Р оранжевый. */
 @Composable
 fun ChannelBadge(channel: Channel, size: Dp = 40.dp, active: Boolean = true) {
     val color = channelColor(channel)
@@ -133,7 +130,10 @@ fun ChannelBadge(channel: Channel, size: Dp = 40.dp, active: Boolean = true) {
     }
 }
 
-/** Кольцо удержания: заполняется, пока человек держит сигнал. */
+/**
+ * Кольцо удержания
+ * @param progress - заполнение (0..1)
+ */
 @Composable
 fun HoldRing(progress: Float, color: Color, size: Dp = 48.dp) {
     Canvas(Modifier.size(size)) {
@@ -153,9 +153,8 @@ fun HoldRing(progress: Float, color: Color, size: Dp = 48.dp) {
 }
 
 /**
- * Пункт меню. Подсвеченный пункт обведён рамкой и показывает кольцо удержания.
- *
- * @param ringColor цвет кольца — цвет канала, который сейчас держат.
+ * Пункт меню, у выбранного - рамка и кольцо удержания
+ * @param ringColor - цвет мышцы, которую сейчас держат
  */
 @Composable
 fun MenuItemCard(
@@ -183,15 +182,16 @@ fun MenuItemCard(
             if (subtitle != null) Text(subtitle, fontSize = HomeType.Label, lineHeight = HomeType.LabelLine, color = HomeColors.InkSecondary)
         }
         if (done) Text("✓", fontSize = HomeType.Heading, fontWeight = FontWeight.ExtraBold, color = HomeColors.Accent)
-        if (selected) HoldRing(holdProgress, ringColor)
+        // место под кольцо есть всегда, чтобы пункт не менял высоту при выборе
+        Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+            if (selected) HoldRing(holdProgress, ringColor)
+        }
     }
 }
 
 /**
- * Подсказка, как управлять меню. Новичку — две строки на любую мышцу,
- * опытному — разные роли у С и Р.
- *
- * @param backProgress заполнение «назад» удержанием Р (только у опытного).
+ * Подсказки управления меню, свои для новичка и опытного
+ * @param backProgress - заполнение «назад» удержанием Р (только у опытного)
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -218,6 +218,43 @@ fun ControlHints(level: UserLevel, hasBack: Boolean, backProgress: Float = 0f) {
     }
 }
 
+/**
+ * Блок с инструкцией по управлению меню
+ */
+@Composable
+fun ControlGuide(level: UserLevel, hasBack: Boolean, modifier: Modifier = Modifier) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("Управление", fontSize = HomeType.Label, fontWeight = FontWeight.Bold, color = HomeColors.InkSecondary)
+        if (level == UserLevel.NOVICE) {
+            GuideRow(null, "Коротко", "следующий пункт")
+            GuideRow(null, "Удержать", "выбрать")
+            Text("любой мышцей", fontSize = HomeType.Label, color = HomeColors.InkSecondary)
+        } else {
+            GuideRow(Channel.FLEXOR, "Коротко", "вниз")
+            GuideRow(Channel.EXTENSOR, "Коротко", "вверх")
+            GuideRow(Channel.FLEXOR, "Удержать", "выбрать")
+            if (hasBack) GuideRow(Channel.EXTENSOR, "Удержать", "назад")
+        }
+    }
+}
+
+// channel = null - любая мышца
+@Composable
+private fun GuideRow(channel: Channel?, key: String, action: String) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        if (channel != null) {
+            ChannelBadge(channel, size = 32.dp)
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                ChannelBadge(Channel.FLEXOR, size = 32.dp)
+                ChannelBadge(Channel.EXTENSOR, size = 32.dp)
+            }
+        }
+        Text(key, fontSize = HomeType.Body, fontWeight = FontWeight.ExtraBold, color = HomeColors.Ink)
+        Text("— $action", fontSize = HomeType.Body, color = HomeColors.InkSecondary)
+    }
+}
+
 @Composable
 private fun HintChip(key: String, action: String, channel: Channel? = null) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -227,7 +264,6 @@ private fun HintChip(key: String, action: String, channel: Channel? = null) {
     }
 }
 
-/** Горизонтальная полоса прогресса. */
 @Composable
 fun ProgressStrip(progress: Float, color: Color, modifier: Modifier = Modifier, height: Dp = 10.dp) {
     Box(
@@ -247,7 +283,9 @@ fun ProgressStrip(progress: Float, color: Color, modifier: Modifier = Modifier, 
     }
 }
 
-/** Два вертикальных столбика силы С и Р — чтобы во время задания было видно свой сигнал. */
+/**
+ * Столбики силы С и Р (strength, 0..100)
+ */
 @Composable
 fun SignalBars(state: SignalState, modifier: Modifier = Modifier, barHeight: Dp = 72.dp) {
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Bottom) {
@@ -279,7 +317,6 @@ private fun SignalBar(channel: Channel, strength: Int, active: Boolean, barHeigh
     }
 }
 
-/** Плитка со значением: «Чистота сигнала · 86%». */
 @Composable
 fun StatTile(label: String, value: String, modifier: Modifier = Modifier) {
     Column(
@@ -294,7 +331,9 @@ fun StatTile(label: String, value: String, modifier: Modifier = Modifier) {
     }
 }
 
-/** Строка-предупреждение (встречный сигнал и т. п.). Пустая строка держит место, чтобы вёрстка не прыгала. */
+/**
+ * Строка предупреждения. При text = null место остаётся, чтобы экран не прыгал
+ */
 @Composable
 fun WarningLine(text: String?) {
     Box(
@@ -310,7 +349,6 @@ fun WarningLine(text: String?) {
     }
 }
 
-/** Звёзды игрока в правом верхнем углу. */
 @Composable
 fun StarsBadge(stars: Int) {
     Row(
@@ -326,28 +364,23 @@ fun StarsBadge(stars: Int) {
     }
 }
 
+// затемнение под окнами
+val OverlayScrim = Color.Black.copy(alpha = 0.7f)
+
 /**
- * Окно поверх экрана с одной кнопкой. Кнопка нажимается удержанием ЛЮБОЙ мышцы —
- * кольцо на кнопке заполняется, пока держишь.
- * Используется перед действиями, к которым человек должен подготовиться (шаги калибровки и т. п.).
- *
- * @param holdProgress заполнение кольца 0..1.
- * @param ringColor цвет мышцы, которую сейчас держат.
+ * Карточка по центру экрана поверх затемнения
+ * @param dimmed - false, если затемнение рисуется отдельно (для плавной смены окон)
  */
 @Composable
-fun HoldPopup(
-    title: String,
-    text: String,
-    buttonTitle: String,
-    holdProgress: Float,
-    ringColor: Color,
+fun HomeOverlay(
     modifier: Modifier = Modifier,
-    hint: String = "удерживайте любую мышцу"
+    dimmed: Boolean = true,
+    content: @Composable ColumnScope.() -> Unit
 ) {
     Box(
         modifier
             .fillMaxSize()
-            .background(HomeColors.Ink.copy(alpha = 0.45f))
+            .then(if (dimmed) Modifier.background(OverlayScrim) else Modifier)
             .padding(24.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -357,22 +390,41 @@ fun HoldPopup(
                 .clip(RoundedCornerShape(28.dp))
                 .background(HomeColors.Card)
                 .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Text(title, fontSize = HomeType.Title, lineHeight = HomeType.TitleLine, fontWeight = FontWeight.ExtraBold, color = HomeColors.Ink)
-            Text(text, fontSize = HomeType.Body, lineHeight = HomeType.BodyLine, color = HomeColors.Ink)
-            Gap(4.dp)
-            MenuItemCard(
-                title = buttonTitle,
-                subtitle = hint,
-                selected = true,
-                holdProgress = holdProgress,
-                ringColor = ringColor
-            )
-        }
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            content = content
+        )
     }
 }
 
-/** Пустое место заданной высоты. */
+/**
+ * Окно с одной кнопкой (кнопка - удержание любой мышцы)
+ * @param holdProgress - заполнение кольца (0..1)
+ * @param ringColor - цвет мышцы, которую сейчас держат
+ */
+@Composable
+fun HoldPopup(
+    title: String,
+    text: String,
+    buttonTitle: String,
+    holdProgress: Float,
+    ringColor: Color,
+    modifier: Modifier = Modifier,
+    hint: String = "удерживайте любую мышцу",
+    dimmed: Boolean = true
+) {
+    HomeOverlay(modifier, dimmed) {
+        Text(title, fontSize = HomeType.Title, lineHeight = HomeType.TitleLine, fontWeight = FontWeight.ExtraBold, color = HomeColors.Ink)
+        Text(text, fontSize = HomeType.Body, lineHeight = HomeType.BodyLine, color = HomeColors.Ink)
+        Gap(4.dp)
+        MenuItemCard(
+            title = buttonTitle,
+            subtitle = hint,
+            selected = true,
+            holdProgress = holdProgress,
+            ringColor = ringColor
+        )
+    }
+}
+
 @Composable
 fun Gap(height: Dp) = Spacer(Modifier.height(height))

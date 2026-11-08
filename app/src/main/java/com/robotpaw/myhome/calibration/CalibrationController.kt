@@ -2,14 +2,22 @@ package com.robotpaw.myhome.calibration
 
 import com.robotpaw.myhome.signal.SignalData
 
-/** Шаги калибровки по порядку. */
 enum class CalibrationStep { REST, FLEXOR, EXTENSOR }
 
-/** Что сейчас показывает экран калибровки. */
+/**
+ * Фаза калибровки
+ */
 sealed interface CalibrationPhase {
     val stepIndex: Int
 
-    /** Отсчёт перед записью. */
+    /**
+     * Окно перед шагом, ждём confirm()
+     */
+    data class Intro(
+        val step: CalibrationStep,
+        override val stepIndex: Int
+    ) : CalibrationPhase
+
     data class Preparing(
         val step: CalibrationStep,
         override val stepIndex: Int,
@@ -17,11 +25,9 @@ sealed interface CalibrationPhase {
     ) : CalibrationPhase
 
     /**
-     * Идёт запись шага.
-     *
-     * @param isHolding человек делает то, что просят (держит сжатие / раскрытие / покой).
-     * Если нет — запись на паузе, прогресс стоит на месте.
-     * @param waitingMs сколько уже ждём нужный сигнал без перерыва (для подсказки «проверьте протез»).
+     * Запись шага
+     * @param isHolding - человек держит нужное состояние, иначе запись на паузе
+     * @param waitingMs - сколько ждём нужный сигнал без перерыва
      */
     data class Recording(
         val step: CalibrationStep,
@@ -32,45 +38,44 @@ sealed interface CalibrationPhase {
         val waitingMs: Long = 0L
     ) : CalibrationPhase
 
-    /** Калибровка закончена (успешно или нет — смотри result.isSuccess). */
+    /**
+     * Шаг записан, пауза перед следующим
+     * @param step - шаг, который только что закончился
+     */
+    data class StepDone(
+        val step: CalibrationStep,
+        override val stepIndex: Int
+    ) : CalibrationPhase
+
     data class Finished(val result: CalibrationResult) : CalibrationPhase {
         override val stepIndex: Int get() = CalibrationController.STEPS.size
     }
 }
 
 /**
- * Пошаговый сценарий калибровки. Ведётся только кадрами сигнала, без таймеров и касаний:
- * время берётся из timestampMs кадра, поэтому сценарий легко тестировать.
+ * Сценарий калибровки, время берётся из timestampMs кадров
+ * Шаг: окно (если requireConfirm) -> отсчёт -> запись -> пауза stepDoneMs
  *
- * Каждый шаг: отсчёт [prepareMs] → запись [recordMs].
- *
- * Запись идёт, только пока человек делает то, что просят:
- * - покой — оба канала ниже [REST_MAX_LEVEL];
- * - сжатие / раскрытие — нужный канал выше уровня покоя на [CalibrationCalculator.MIN_RANGE].
- *
- * Прогресс растёт только вместе с записанными кадрами: первые [reactionMs] каждого удержания
- * не пишутся и прогресс не двигают. Поэтому одиночные скачки и шумы шаг не «проматывают».
- * Короткие провалы сигнала (до [graceMs]) удержание не прерывают — так ведёт себя
- * настоящий ЭМГ, когда электрод на мгновение теряет контакт.
- *
- * Если за [stepTimeoutMs] шаг так и не записался, калибровка сразу заканчивается
- * с понятной причиной. Шаг никогда не засчитывается «с тем, что есть».
- *
- * Пауза между кадрами учитывается не больше [maxFrameGapMs]:
- * если телефон подтормозил, шаг не проскочит сам собой.
+ * @param reactionMs - начало каждого удержания не пишется (защита от скачков)
+ * @param graceMs - провал сигнала короче этого не прерывает удержание
+ * @param stepTimeoutMs - если шаг не записался за это время, калибровка заканчивается неудачей
+ * @param maxFrameGapMs - максимум времени между кадрами, чтобы шаг не проскочил при подтормаживании
  */
 class CalibrationController(
-    private val prepareMs: Long = 2000L,
+    private val prepareMs: Long = 3000L,
     private val recordMs: Long = 3000L,
     private val reactionMs: Long = 500L,
     private val graceMs: Long = 150L,
     private val stepTimeoutMs: Long = 20_000L,
-    private val maxFrameGapMs: Long = 100L
+    private val maxFrameGapMs: Long = 100L,
+    private val requireConfirm: Boolean = true,
+    private val stepDoneMs: Long = 1500L
 ) {
     private var stepIndex = 0
     private var recording = false
     private var lastFrameMs: Long? = null
     private var prepareLeftMs = prepareMs
+    private var doneLeftMs = 0L
     private var recordedMs = 0L    // сколько записано в этом шаге
     private var holdMs = 0L        // сколько держат без перерыва
     private var missMs = 0L        // сколько длится текущий провал сигнала
@@ -79,8 +84,19 @@ class CalibrationController(
     private var restExtensor = 0
     private val samples = mutableMapOf<CalibrationStep, MutableList<SignalData>>()
 
-    var phase: CalibrationPhase = CalibrationPhase.Preparing(STEPS.first(), 0, prepareMs)
+    var phase: CalibrationPhase = startOf(0)
         private set
+
+    /**
+     * Закрыть окно перед шагом и начать отсчёт
+     */
+    fun confirm() {
+        val p = phase
+        if (p is CalibrationPhase.Intro) {
+            lastFrameMs = null
+            phase = CalibrationPhase.Preparing(p.step, p.stepIndex, prepareMs)
+        }
+    }
 
     fun restart() {
         stepIndex = 0
@@ -89,14 +105,20 @@ class CalibrationController(
         samples.clear()
         lastFrameMs = null
         resetStep()
-        phase = CalibrationPhase.Preparing(STEPS.first(), 0, prepareMs)
+        phase = startOf(0)
     }
 
     fun onFrame(frame: SignalData): CalibrationPhase {
-        if (phase is CalibrationPhase.Finished) return phase
+        if (phase is CalibrationPhase.Finished || phase is CalibrationPhase.Intro) return phase
 
         val dt = lastFrameMs?.let { (frame.timestampMs - it).coerceIn(0L, maxFrameGapMs) } ?: 0L
         lastFrameMs = frame.timestampMs
+        if (phase is CalibrationPhase.StepDone) {
+            doneLeftMs -= dt
+            if (doneLeftMs <= 0L) phase = startOf(stepIndex)
+            return phase
+        }
+
         val step = STEPS[stepIndex]
 
         if (!recording) {
@@ -119,10 +141,9 @@ class CalibrationController(
             missMs += dt
             if (missMs > graceMs) holdMs = 0L
         }
-        // Короткий провал сигнала удержание не прерывает.
         val holding = holdingNow || (holdMs > 0L && missMs <= graceMs)
 
-        // Пишем и двигаем прогресс только по настоящим кадрам удержания, после времени реакции.
+        // прогресс двигается только вместе с записью
         if (holdingNow && holdMs >= reactionMs) {
             samples.getOrPut(step) { mutableListOf() }.add(frame)
             recordedMs += dt
@@ -164,6 +185,7 @@ class CalibrationController(
             restExtensor = CalibrationCalculator.percentile(rest.map { it.extensor }, 0.9f)
         }
 
+        val done = CalibrationPhase.StepDone(STEPS[stepIndex], stepIndex)
         stepIndex++
         resetStep()
 
@@ -176,8 +198,14 @@ class CalibrationController(
                 )
             )
         }
-        return CalibrationPhase.Preparing(STEPS[stepIndex], stepIndex, prepareMs)
+        if (stepDoneMs <= 0L) return startOf(stepIndex)
+        doneLeftMs = stepDoneMs
+        return done
     }
+
+    private fun startOf(index: Int): CalibrationPhase =
+        if (requireConfirm) CalibrationPhase.Intro(STEPS[index], index)
+        else CalibrationPhase.Preparing(STEPS[index], index, prepareMs)
 
     /** Если шаг не записался за отведённое время  */
     private fun fail(step: CalibrationStep): CalibrationPhase {
@@ -192,10 +220,10 @@ class CalibrationController(
     companion object {
         val STEPS = listOf(CalibrationStep.REST, CalibrationStep.FLEXOR, CalibrationStep.EXTENSOR)
 
-        /** В покое оба канала должны быть ниже этого уровня, иначе запись покоя на паузе. */
+        // в покое оба канала должны быть ниже
         const val REST_MAX_LEVEL = 30
 
-        /** Через сколько ожидания показать подсказку про посадку протеза. */
+        // через сколько без сигнала показать подсказку про протез
         const val FIT_HINT_AFTER_MS = 5000L
     }
 }

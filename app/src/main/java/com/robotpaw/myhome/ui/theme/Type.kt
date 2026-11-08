@@ -34,23 +34,23 @@ val Typography = Typography(
 )
 
 /**
- * Размеры текста «Мой дом».
+ * Размеры текста интерфейса. Меньше Caption не используем
  */
 object HomeType {
-    val Display = 38.sp        // главный заголовок результата: «Готово!»
+    val Display = 38.sp        // «Готово!»
     val DisplayLine = 44.sp
 
-    val Title = 32.sp          // заголовок экрана
+    val Title = 32.sp          // заголовок экрана и окна
     val TitleLine = 38.sp
 
-    val Heading = 24.sp        // пункт меню, заголовок окна, крупные числа
+    val Heading = 24.sp        // пункт меню
     val HeadingLine = 30.sp
 
-    val Body = 20.sp           // основной текст, пояснения
+    val Body = 20.sp
     val BodyLine = 27.sp
 
-    val Label = 18.sp          // подписи под пунктами, шапка экрана, подсказки
+    val Label = 18.sp          // подписи, подсказки
     val LabelLine = 24.sp
 
-    val Caption = 16.sp        // самый мелкий текст: подписи к столбикам, служебное
+    val Caption = 16.sp        // подписи к столбикам
 }
