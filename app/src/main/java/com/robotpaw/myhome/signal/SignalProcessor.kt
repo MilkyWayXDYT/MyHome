@@ -46,8 +46,8 @@ class SignalProcessor(
         extensorStrength = smooth(extensorStrength, state.extensorStrength.toFloat())
 
         val smoothed = state.copy(
-            flexorSignal = flexorStrength.roundToInt(),
-            extensorSignal = extensorStrength.roundToInt()
+            flexorStrength = flexorStrength.roundToInt(),
+            extensorStrength = extensorStrength.roundToInt()
         )
 
         previous = smoothed
