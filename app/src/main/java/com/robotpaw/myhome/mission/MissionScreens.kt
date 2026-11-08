@@ -15,10 +15,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.robotpaw.myhome.game.Mission
+import com.robotpaw.myhome.game.MissionCheckpoint
 import com.robotpaw.myhome.game.MissionResult
 import com.robotpaw.myhome.menu.MenuItem
 import com.robotpaw.myhome.menu.MenuList
 import com.robotpaw.myhome.menu.rememberMenuControl
+import com.robotpaw.myhome.mission.mechanics.Mechanics
+import com.robotpaw.myhome.mission.mechanics.MissionMechanic
 import com.robotpaw.myhome.signal.SignalProfile
 import com.robotpaw.myhome.signal.SignalSource
 import com.robotpaw.myhome.ui.components.HomeCard
@@ -68,11 +71,40 @@ fun InstructionScreen(
 }
 
 /**
- * Экран задания (заглушка: вместо механики два пункта меню)
- * Механика заменяет тело функции: слушает source.frames, по завершении вызывает onDone, для паузы onPause
+ * Экран задания: если у вида задания есть механика, запускает её, иначе показывает заглушку
+ * @param checkpoint - откуда продолжаем после паузы
+ * @param onPause - окно поддержки; чекпоинт вернётся в этот экран, если игрок выберет «Продолжить»
  */
 @Composable
 fun MissionScreen(
+    source: SignalSource,
+    profile: SignalProfile,
+    roomTitle: String,
+    mission: Mission,
+    checkpoint: MissionCheckpoint,
+    onDone: (MissionResult) -> Unit,
+    onPause: (MissionCheckpoint) -> Unit
+) {
+    if (Mechanics.has(mission.kind)) {
+        MissionMechanic(
+            source = source,
+            profile = profile,
+            roomTitle = roomTitle,
+            mission = mission,
+            checkpoint = checkpoint,
+            onDone = { log -> onDone(MissionResult(mission, log)) },
+            onPause = onPause
+        )
+    } else {
+        StubMission(source, profile, roomTitle, mission, onDone) { onPause(checkpoint) }
+    }
+}
+
+/**
+ * Заглушка для заданий без механики: два пункта меню
+ */
+@Composable
+private fun StubMission(
     source: SignalSource,
     profile: SignalProfile,
     roomTitle: String,

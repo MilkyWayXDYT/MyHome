@@ -59,9 +59,10 @@ data class Mission(
 )
 
 /**
- * Итог задания для экрана результата (статистика добавится вместе с механикой)
+ * Итог задания для экрана результата
+ * @param log - что происходило во время задания (по умолчанию пустой, для заглушек)
  */
-data class MissionResult(val mission: Mission)
+data class MissionResult(val mission: Mission, val log: MissionLog = MissionLog())
 
 object Missions {
 

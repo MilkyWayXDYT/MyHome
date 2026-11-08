@@ -27,6 +27,7 @@ import com.robotpaw.myhome.calibration.CalibrationScreen
 import com.robotpaw.myhome.emulator.EmulatorSignalSource
 import com.robotpaw.myhome.game.GameProgress
 import com.robotpaw.myhome.game.Mission
+import com.robotpaw.myhome.game.MissionCheckpoint
 import com.robotpaw.myhome.game.MissionResult
 import com.robotpaw.myhome.game.Rooms
 import com.robotpaw.myhome.menu.RoomScreen
@@ -140,8 +141,8 @@ private sealed interface Screen {
     data class Room(val roomId: String, val wall: Int = 0) : Screen
     data class Rest(val roomId: String) : Screen
     data class Instruction(val mission: Mission) : Screen
-    data class Play(val mission: Mission) : Screen
-    data class Pause(val mission: Mission) : Screen
+    data class Play(val mission: Mission, val checkpoint: MissionCheckpoint = MissionCheckpoint()) : Screen
+    data class Pause(val mission: Mission, val checkpoint: MissionCheckpoint) : Screen
     // roomCompleted - этим заданием пройдена вся комната
     data class Result(val result: MissionResult, val roomCompleted: Boolean) : Screen
 }
@@ -275,13 +276,14 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
                 profile = profile,
                 roomTitle = Rooms.of(current.mission).title,
                 mission = current.mission,
+                checkpoint = current.checkpoint,
                 onDone = { result ->
                     val room = Rooms.of(current.mission)
                     val wasDone = progress.isDone(room)
                     progress = progress.withCompleted(current.mission)
                     screen = Screen.Result(result, roomCompleted = !wasDone && progress.isDone(room))
                 },
-                onPause = { screen = Screen.Pause(current.mission) }
+                onPause = { checkpoint -> screen = Screen.Pause(current.mission, checkpoint) }
             )
 
             is Screen.Pause -> PauseScreen(
@@ -289,7 +291,7 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
                 profile = profile,
                 onChoice = { choice ->
                     screen = when (choice) {
-                        PauseChoice.CONTINUE -> Screen.Play(current.mission)
+                        PauseChoice.CONTINUE -> Screen.Play(current.mission, current.checkpoint)
                         PauseChoice.MENU -> Screen.MainMenu
                     }
                 }
