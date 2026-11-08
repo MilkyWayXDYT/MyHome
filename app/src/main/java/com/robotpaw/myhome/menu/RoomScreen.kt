@@ -22,7 +22,6 @@ import com.robotpaw.myhome.mission.EmptyWall
 import com.robotpaw.myhome.mission.MissionObject
 import com.robotpaw.myhome.signal.SignalProfile
 import com.robotpaw.myhome.signal.SignalSource
-import com.robotpaw.myhome.ui.components.ControlHints
 import com.robotpaw.myhome.ui.components.HoldRing
 import com.robotpaw.myhome.ui.components.HomeCard
 import com.robotpaw.myhome.ui.components.HomeScreen
@@ -60,7 +59,7 @@ fun RoomScreen(
     HomeScreen(
         title = room.title,
         overline = "${index + 1} из ${control.items.size}",
-        bottom = { ControlHints(control.level, hasBack = true, backProgress = control.backProgress) }
+        backProgress = control.backProgress
     ) {
         if (mission != null) {
             MissionObject(
@@ -78,16 +77,14 @@ fun RoomScreen(
 
         HomeCard(highlighted = true) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Column(Modifier.weight(1f)) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(item.title, fontSize = HomeType.Heading, fontWeight = FontWeight.ExtraBold, color = HomeColors.Ink)
-                    Text(
-                        when {
-                            mission == null -> "удержание — выйти"
-                            item.done -> "выполнено, можно ещё раз"
-                            else -> "удержание — начать"
-                        },
-                        fontSize = HomeType.Label, color = HomeColors.InkSecondary
-                    )
+                    if (item.subtitle != null) {
+                        Text(item.subtitle, fontSize = HomeType.Label, color = HomeColors.InkSecondary)
+                    }
+                    if (item.done) {
+                        Text("выполнено", fontSize = HomeType.Label, fontWeight = FontWeight.Bold, color = HomeColors.Accent)
+                    }
                 }
                 HoldRing(control.selectProgress, control.ringColor)
             }

@@ -438,7 +438,7 @@ private fun ResultSummary(result: CalibrationResult, profile: SignalProfile, lev
             )
         }
         Box(Modifier.fillMaxWidth().height(1.dp).background(HomeColors.Divider))
-        ControlGuide(level, hasBack = false)
+        ControlGuide(level, hasBack = true)
     }
 }
 

@@ -38,4 +38,12 @@ class MenuNavigatorTest {
         assertEquals(MenuAction.Back, menu.onEvent(ControlEvent.Hold(Channel.EXTENSOR)))
         assertFalse(menu.holdSelects(Channel.EXTENSOR))
     }
+
+    @Test
+    fun experienced_noItems_onlyBack() {
+        val menu = MenuNavigator(itemCount = 0, level = UserLevel.EXPERIENCED)
+        assertNull(menu.onEvent(ControlEvent.Pulse(Channel.FLEXOR)))
+        assertNull(menu.onEvent(ControlEvent.Hold(Channel.FLEXOR)))
+        assertEquals(MenuAction.Back, menu.onEvent(ControlEvent.Hold(Channel.EXTENSOR)))
+    }
 }

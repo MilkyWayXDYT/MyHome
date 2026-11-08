@@ -76,6 +76,10 @@ fun rememberMenuControl(
     val detector = remember(profile) { HoldDetector(profile.minPulseMs, profile.holdToSelectMs) }
 
     val currentEnabled by rememberUpdatedState(enabled)
+    // после включения ждём расслабления, иначе удержание, начатое во время таймера, сразу нажмёт пункт
+    LaunchedEffect(enabled) {
+        if (enabled) detector.reset()
+    }
     val currentOnSelect by rememberUpdatedState(onSelect)
     val currentOnBack by rememberUpdatedState(onBack)
     val baseCount = items.size

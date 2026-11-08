@@ -37,7 +37,7 @@ import com.robotpaw.myhome.signal.SignalSource
 import com.robotpaw.myhome.signal.SignalState
 import com.robotpaw.myhome.signal.UserLevel
 import com.robotpaw.myhome.ui.components.ChannelBadge
-import com.robotpaw.myhome.ui.components.ControlHints
+import com.robotpaw.myhome.ui.components.ControlGuide
 import com.robotpaw.myhome.ui.components.HoldPopup
 import com.robotpaw.myhome.ui.components.HoldRing
 import com.robotpaw.myhome.ui.components.HomeCard
@@ -169,8 +169,8 @@ fun ComponentGallery(
             ProgressStrip(progress, HomeColors.Extensor, height = 16.dp)
         }
 
-        Section("ControlHints — подсказки управления") {
-            ControlHints(level, hasBack = true, backProgress = if (experienced) ringProgress else 0f)
+        Section("ControlGuide — блок управления") {
+            ControlGuide(level, hasBack = true)
         }
 
         Section("WarningLine — предупреждение") {

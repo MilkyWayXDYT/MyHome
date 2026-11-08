@@ -15,7 +15,6 @@ import com.robotpaw.myhome.game.Rooms
 import com.robotpaw.myhome.signal.SignalProfile
 import com.robotpaw.myhome.signal.SignalSource
 import com.robotpaw.myhome.signal.UserLevel
-import com.robotpaw.myhome.ui.components.ControlHints
 import com.robotpaw.myhome.ui.components.HomeCard
 import com.robotpaw.myhome.ui.components.HomeScreen
 import com.robotpaw.myhome.ui.components.MenuItemCard
@@ -71,8 +70,7 @@ fun MainMenuScreen(
 
     HomeScreen(
         title = "Мой дом",
-        overline = "Добрый день!",
-        bottom = { ControlHints(control.level, hasBack = false) }
+        overline = "Добрый день!"
     ) {
         MenuList(control)
     }
@@ -108,7 +106,7 @@ fun RoomsScreen(
 
     HomeScreen(
         title = "Комнаты",
-        bottom = { ControlHints(control.level, hasBack = true, backProgress = control.backProgress) }
+        backProgress = control.backProgress
     ) {
         MenuList(control)
     }
@@ -126,14 +124,16 @@ fun GoalsScreen(
     val control = rememberMenuControl(
         source = source,
         profile = profile,
-        items = listOf(MenuItem("В меню")),
-        onSelect = { onBack() }
+        items = emptyList(),
+        backTitle = "В меню",
+        onBack = onBack,
+        onSelect = {}
     )
 
     HomeScreen(
         title = "Цели на сегодня",
         overline = "Подобрано для вас",
-        bottom = { ControlHints(control.level, hasBack = false) }
+        backProgress = control.backProgress
     ) {
         listOf("Цель 1", "Цель 2", "Цель 3").forEach { title ->
             HomeCard {

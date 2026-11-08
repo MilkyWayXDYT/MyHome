@@ -21,7 +21,6 @@ import com.robotpaw.myhome.menu.MenuList
 import com.robotpaw.myhome.menu.rememberMenuControl
 import com.robotpaw.myhome.signal.SignalProfile
 import com.robotpaw.myhome.signal.SignalSource
-import com.robotpaw.myhome.ui.components.ControlHints
 import com.robotpaw.myhome.ui.components.HomeCard
 import com.robotpaw.myhome.ui.components.HomeScreen
 import com.robotpaw.myhome.ui.theme.HomeColors
@@ -51,7 +50,7 @@ fun InstructionScreen(
     HomeScreen(
         title = mission.title,
         overline = "Инструкция к заданию",
-        bottom = { ControlHints(control.level, hasBack = true, backProgress = control.backProgress) }
+        backProgress = control.backProgress
     ) {
         HomeCard {
             mission.instruction.forEachIndexed { i, line ->
@@ -93,8 +92,7 @@ fun MissionScreen(
 
     HomeScreen(
         title = mission.title,
-        overline = "$roomTitle · задание",
-        bottom = { ControlHints(control.level, hasBack = false) }
+        overline = "$roomTitle · задание"
     ) {
         MissionObject(mission.kind, progress = 0f, modifier = Modifier.weight(1f))
         HomeCard {
@@ -138,9 +136,7 @@ fun PauseScreen(
         subtitle = "Мышцы устают — это нормально.",
         bottom = {
             if (secondsLeft > 0) {
-                Text("Пока идёт таймер, выбор выключен", fontSize = HomeType.Caption, color = HomeColors.InkSecondary)
-            } else {
-                ControlHints(control.level, hasBack = false)
+                Text("Пока идёт таймер, выбор выключен", fontSize = HomeType.Label, color = HomeColors.InkSecondary)
             }
         }
     ) {
@@ -173,8 +169,7 @@ fun ResultScreen(
 
     HomeScreen(
         title = result.mission.doneTitle,
-        overline = "Результат задания",
-        bottom = { ControlHints(control.level, hasBack = false) }
+        overline = "Результат задания"
     ) {
         HomeCard {
             Text("Здесь будет статистика задания", fontSize = HomeType.Body, fontWeight = FontWeight.Bold, color = HomeColors.Ink)
@@ -205,8 +200,7 @@ fun RestScreen(
     HomeScreen(
         title = "Отдохните",
         overline = "$roomTitle пройдена",
-        subtitle = "Расслабьте руку, прежде чем идти дальше.",
-        bottom = { ControlHints(control.level, hasBack = false) }
+        subtitle = "Расслабьте руку, прежде чем идти дальше."
     ) {
         HomeCard {
             Text("Здесь будет экран отдыха", fontSize = HomeType.Body, fontWeight = FontWeight.Bold, color = HomeColors.Ink)

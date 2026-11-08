@@ -7,10 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -51,7 +48,8 @@ fun channelLetter(channel: Channel): String =
 
 /**
  * Каркас экрана
- * @param bottom - закреплено внизу (обычно подсказки управления)
+ * @param backProgress - заполнение «назад» удержанием Р, пока держат - справа в шапке кольцо
+ * @param bottom - закреплено внизу
  */
 @Composable
 fun HomeScreen(
@@ -59,7 +57,7 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
     overline: String? = null,
     subtitle: String? = null,
-    trailing: @Composable RowScope.() -> Unit = {},
+    backProgress: Float = 0f,
     bottom: @Composable ColumnScope.() -> Unit = {},
     content: @Composable ColumnScope.() -> Unit
 ) {
@@ -81,7 +79,12 @@ fun HomeScreen(
                     Text(subtitle, fontSize = HomeType.Body, lineHeight = HomeType.BodyLine, color = HomeColors.InkSecondary)
                 }
             }
-            trailing()
+            if (backProgress > 0f) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Назад", fontSize = HomeType.Label, fontWeight = FontWeight.Bold, color = HomeColors.Ink)
+                    HoldRing(backProgress, HomeColors.Extensor, 36.dp)
+                }
+            }
         }
         Column(
             modifier = Modifier.weight(1f).fillMaxWidth(),
@@ -190,35 +193,6 @@ fun MenuItemCard(
 }
 
 /**
- * Подсказки управления меню, свои для новичка и опытного
- * @param backProgress - заполнение «назад» удержанием Р (только у опытного)
- */
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-fun ControlHints(level: UserLevel, hasBack: Boolean, backProgress: Float = 0f) {
-    FlowRow(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        if (level == UserLevel.NOVICE) {
-            HintChip("короткий сигнал", "следующий пункт")
-            HintChip("удержание", "выбрать")
-        } else {
-            HintChip("С", "вниз", Channel.FLEXOR)
-            HintChip("Р", "вверх", Channel.EXTENSOR)
-            HintChip("держать С", "выбрать", Channel.FLEXOR)
-            if (hasBack) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    HintChip("держать Р", "назад", Channel.EXTENSOR)
-                    if (backProgress > 0f) HoldRing(backProgress, HomeColors.Extensor, 28.dp)
-                }
-            }
-        }
-    }
-}
-
-/**
  * Блок с инструкцией по управлению меню
  */
 @Composable
@@ -252,15 +226,6 @@ private fun GuideRow(channel: Channel?, key: String, action: String) {
         }
         Text(key, fontSize = HomeType.Body, fontWeight = FontWeight.ExtraBold, color = HomeColors.Ink)
         Text("— $action", fontSize = HomeType.Body, color = HomeColors.InkSecondary)
-    }
-}
-
-@Composable
-private fun HintChip(key: String, action: String, channel: Channel? = null) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        if (channel != null) Box(Modifier.size(14.dp).clip(CircleShape).background(channelColor(channel)))
-        Text(key, fontSize = HomeType.Label, fontWeight = FontWeight.Bold, color = HomeColors.Ink)
-        Text("— $action", fontSize = HomeType.Label, color = HomeColors.InkSecondary)
     }
 }
 

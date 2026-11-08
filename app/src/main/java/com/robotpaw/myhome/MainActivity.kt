@@ -25,24 +25,26 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.lifecycle.lifecycleScope
 import com.robotpaw.myhome.calibration.CalibrationScreen
 import com.robotpaw.myhome.emulator.EmulatorSignalSource
+import com.robotpaw.myhome.game.GameProgress
+import com.robotpaw.myhome.game.Mission
+import com.robotpaw.myhome.game.MissionResult
+import com.robotpaw.myhome.game.Rooms
+import com.robotpaw.myhome.menu.RoomScreen
 import com.robotpaw.myhome.developer.SignalCheckScreen
+import com.robotpaw.myhome.menu.GoalsScreen
+import com.robotpaw.myhome.menu.MainMenuChoice
+import com.robotpaw.myhome.menu.MainMenuScreen
+import com.robotpaw.myhome.menu.RoomsScreen
+import com.robotpaw.myhome.mission.InstructionScreen
+import com.robotpaw.myhome.mission.MissionScreen
+import com.robotpaw.myhome.mission.PauseChoice
+import com.robotpaw.myhome.mission.PauseScreen
+import com.robotpaw.myhome.mission.RestScreen
+import com.robotpaw.myhome.mission.ResultChoice
+import com.robotpaw.myhome.mission.ResultScreen
 import com.robotpaw.myhome.signal.Channel
 import com.robotpaw.myhome.signal.SignalProcessor
 import com.robotpaw.myhome.signal.SignalProfile
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Text
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.sp
-import com.robotpaw.myhome.signal.ControlEvent
-import com.robotpaw.myhome.signal.HoldDetector
-import com.robotpaw.myhome.signal.MenuAction
-import com.robotpaw.myhome.signal.MenuNavigator
-import com.robotpaw.myhome.signal.SignalSource
-import com.robotpaw.myhome.signal.UserLevel
-import com.robotpaw.myhome.ui.theme.HomeColors
 import kotlin.math.roundToInt
 
 class MainActivity : ComponentActivity() {
@@ -128,13 +130,33 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private enum class Screen { CALIBRATION, MENU_TEST, SIGNAL_CHECK, GALLERY }
+private sealed interface Screen {
+    data object Calibration : Screen
+    data object MainMenu : Screen
+    data object Goals : Screen
+    data object SignalCheck : Screen
+    data object Gallery : Screen
+    data object RoomList : Screen
+    data class Room(val roomId: String, val wall: Int = 0) : Screen
+    data class Rest(val roomId: String) : Screen
+    data class Instruction(val mission: Mission) : Screen
+    data class Play(val mission: Mission) : Screen
+    data class Pause(val mission: Mission) : Screen
+    // roomCompleted - этим заданием пройдена вся комната
+    data class Result(val result: MissionResult, val roomCompleted: Boolean) : Screen
+}
+
+private fun roomScreenOf(mission: Mission): Screen.Room {
+    val room = Rooms.of(mission)
+    return Screen.Room(room.id, room.missions.indexOf(mission))
+}
 
 @Composable
 fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
 
     // Профиль пока живёт только в памяти, поэтому после поворота экрана начинаем с калибровки.
-    var screen by remember { mutableStateOf(Screen.CALIBRATION) }
+    var screen by remember { mutableStateOf<Screen>(Screen.Calibration) }
+    var progress by remember { mutableStateOf(GameProgress()) }
     var profile by remember { mutableStateOf(SignalProfile()) }
 
     var overlayExpanded by rememberSaveable {
@@ -178,39 +200,133 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
     ) {
 
         // Экраны
-        when (screen) {
-            Screen.CALIBRATION -> CalibrationScreen(
+        when (val current = screen) {
+            Screen.Calibration -> CalibrationScreen(
                 source = emulator,
                 onFinished = {
                     profile = it
-                    screen = Screen.MENU_TEST
+                    screen = Screen.MainMenu
                 }
             )
 
-            Screen.MENU_TEST -> MenuTestScreen(
+            Screen.MainMenu -> MainMenuScreen(
                 source = emulator,
                 profile = profile,
-                onOpen = { index ->
-                    when (index) {
-                        0 -> screen = Screen.SIGNAL_CHECK
-                        1 -> screen = Screen.CALIBRATION
-                        2 -> screen = Screen.GALLERY
+                progress = progress,
+                showDeveloperItems = isDebug,
+                onChoice = { choice ->
+                    screen = when (choice) {
+                        MainMenuChoice.CONTINUE -> Screen.Room(progress.currentRoom().id)
+                        MainMenuChoice.ROOMS -> Screen.RoomList
+                        MainMenuChoice.GOALS -> Screen.Goals
+                        MainMenuChoice.SIGNAL_CHECK -> Screen.SignalCheck
+                        MainMenuChoice.RECALIBRATE -> Screen.Calibration
+                        MainMenuChoice.GALLERY -> Screen.Gallery
                     }
+                }
+            )
+
+            Screen.Goals -> GoalsScreen(
+                source = emulator,
+                profile = profile,
+                onBack = { screen = Screen.MainMenu }
+            )
+
+            Screen.Gallery -> ComponentGallery(
+                source = emulator,
+                profile = profile,
+                onBack = { screen = Screen.MainMenu }
+            )
+
+            Screen.SignalCheck -> SignalCheckScreen(
+                source = emulator,
+                profile = profile,
+                onExit = { screen = Screen.MainMenu }
+            )
+
+            Screen.RoomList -> RoomsScreen(
+                source = emulator,
+                profile = profile,
+                progress = progress,
+                onOpen = { screen = Screen.Room(it.id) },
+                onBack = { screen = Screen.MainMenu }
+            )
+
+            is Screen.Room -> RoomScreen(
+                source = emulator,
+                profile = profile,
+                room = Rooms.byId(current.roomId),
+                progress = progress,
+                initialWall = current.wall,
+                onStart = { screen = Screen.Instruction(it) },
+                onBack = { screen = Screen.MainMenu }
+            )
+
+            is Screen.Instruction -> InstructionScreen(
+                source = emulator,
+                profile = profile,
+                mission = current.mission,
+                onStart = { screen = Screen.Play(current.mission) },
+                onBack = { screen = roomScreenOf(current.mission) }
+            )
+
+            is Screen.Play -> MissionScreen(
+                source = emulator,
+                profile = profile,
+                roomTitle = Rooms.of(current.mission).title,
+                mission = current.mission,
+                onDone = { result ->
+                    val room = Rooms.of(current.mission)
+                    val wasDone = progress.isDone(room)
+                    progress = progress.withCompleted(current.mission)
+                    screen = Screen.Result(result, roomCompleted = !wasDone && progress.isDone(room))
                 },
-                onBack = { screen = Screen.CALIBRATION }
+                onPause = { screen = Screen.Pause(current.mission) }
             )
 
-            Screen.GALLERY -> ComponentGallery(
+            is Screen.Pause -> PauseScreen(
                 source = emulator,
                 profile = profile,
-                onBack = { screen = Screen.MENU_TEST }
+                onChoice = { choice ->
+                    screen = when (choice) {
+                        PauseChoice.CONTINUE -> Screen.Play(current.mission)
+                        PauseChoice.MENU -> Screen.MainMenu
+                    }
+                }
             )
 
-            Screen.SIGNAL_CHECK -> SignalCheckScreen(
+            is Screen.Result -> ResultScreen(
                 source = emulator,
                 profile = profile,
-                onExit = { screen = Screen.MENU_TEST }
+                result = current.result,
+                onChoice = { choice ->
+                    screen = when (choice) {
+                        ResultChoice.ROOM -> {
+                            val room = Rooms.of(current.result.mission)
+                            val next = Rooms.next(room)
+                            when {
+                                !current.roomCompleted -> roomScreenOf(current.result.mission)
+                                room.restAfter -> Screen.Rest(room.id)
+                                next != null -> Screen.Room(next.id)   // после обучения сразу в гостиную
+                                else -> roomScreenOf(current.result.mission)
+                            }
+                        }
+                        ResultChoice.AGAIN -> Screen.Play(current.result.mission)
+                    }
+                }
             )
+
+            is Screen.Rest -> {
+                val room = Rooms.byId(current.roomId)
+                val next = Rooms.next(room)
+                RestScreen(
+                    source = emulator,
+                    profile = profile,
+                    roomTitle = room.title,
+                    nextRoomTitle = next?.title,
+                    onNext = { screen = if (next != null) Screen.Room(next.id) else Screen.MainMenu }
+                )
+            }
         }
 
         // Эмулятор доступен только в debug-сборке.
@@ -247,92 +363,5 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
                     )
             )
         }
-    }
-}
-
-/**
- * Временный экран для проверки MenuNavigator (уберётся с настоящим меню)
- */
-@Composable
-private fun MenuTestScreen(
-    source: SignalSource,
-    profile: SignalProfile,
-    onOpen: (Int) -> Unit,
-    onBack: () -> Unit
-) {
-    val items = listOf("Проверка сигнала", "Калибровка заново", "Витрина компонентов")
-    val navigator = remember(profile) { MenuNavigator(items.size, profile.level) }
-    val processor = remember(profile) { SignalProcessor(profile) }
-    val detector = remember(profile) { HoldDetector(profile.minPulseMs, profile.holdToSelectMs) }
-    val currentOnOpen by rememberUpdatedState(onOpen)
-    val currentOnBack by rememberUpdatedState(onBack)
-
-    var selected by remember { mutableIntStateOf(0) }
-    var holdProgress by remember { mutableFloatStateOf(0f) }
-    var lastEvent by remember { mutableStateOf("пока ничего") }
-
-    LaunchedEffect(source, navigator) {
-        source.frames.collect { frame ->
-            val event = detector.update(processor.process(frame))
-            holdProgress = detector.progress
-            if (event == null) return@collect
-
-            val action = navigator.onEvent(event)
-            selected = navigator.selected
-            lastEvent = when (event) {
-                is ControlEvent.Pulse -> "короткий ${if (event.channel == Channel.FLEXOR) "С" else "Р"}"
-                is ControlEvent.Hold -> "удержание ${if (event.channel == Channel.FLEXOR) "С" else "Р"}"
-            }
-            when (action) {
-                is MenuAction.Select -> {
-                    lastEvent += " → выбран «${items[action.index]}»"
-                    currentOnOpen(action.index)
-                }
-                MenuAction.Back -> currentOnBack()
-                null -> Unit
-            }
-        }
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(HomeColors.Background)
-            .statusBarsPadding()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Text("Проверка меню", fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = HomeColors.Ink)
-        Text(
-            if (profile.level == UserLevel.NOVICE)
-                "Режим: новичок. Короткий сигнал любой мышцей — следующий пункт, удержание — выбрать."
-            else
-                "Режим: опытный. Короткий С — вниз, Р — вверх. Удержание С — выбрать, удержание Р — назад (к калибровке).",
-            fontSize = 15.sp, color = HomeColors.InkSecondary
-        )
-
-        items.forEachIndexed { index, title ->
-            val isSelected = index == selected
-            val shape = RoundedCornerShape(18.dp)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(shape)
-                    .background(HomeColors.Card)
-                    .then(if (isSelected) Modifier.border(3.dp, HomeColors.Flexor, shape) else Modifier)
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    title, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = HomeColors.Ink,
-                    modifier = Modifier.weight(1f)
-                )
-                if (isSelected && holdProgress > 0f) {
-                    Text("${(holdProgress * 100).roundToInt()}%", fontSize = 15.sp, color = HomeColors.Flexor)
-                }
-            }
-        }
-
-        Text("Последнее событие: $lastEvent", fontSize = 15.sp, color = HomeColors.Ink)
     }
 }
