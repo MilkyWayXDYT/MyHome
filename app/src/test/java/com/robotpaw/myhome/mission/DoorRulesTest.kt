@@ -1,6 +1,5 @@
-package com.robotpaw.myhome.mission
+package com.robotpaw.myhome.mission.mechanics.door
 
-import com.robotpaw.myhome.mission.mechanics.door.DoorRules
 import com.robotpaw.myhome.signal.SignalState
 import com.robotpaw.myhome.signal.calculateSignalState
 import org.junit.Assert.assertEquals
@@ -61,6 +60,24 @@ class DoorRulesTest {
         val rules = DoorRules(holdMs = 3000L)
         rules.restore(0.9f)
         repeat(20) { rules.update(flex, 20L) }              // ещё 0,4 с, нужно только 0,3 с
+        assertTrue(rules.isDone)
+    }
+
+    @Test
+    fun novice_progressNeverGoesBack() {
+        val rules = DoorRules(holdMs = 3000L, keepProgress = true)
+        repeat(75) { rules.update(flex, 20L) }              // 0,5
+        repeat(100) { rules.update(rest, 20L) }             // долгий покой
+        repeat(50) { rules.update(both, 20L) }              // встречный сигнал
+        assertEquals(0.5f, rules.progress, 0.01f)
+    }
+
+    @Test
+    fun novice_stillCompletesDoor() {
+        val rules = DoorRules(holdMs = 3000L, keepProgress = true)
+        repeat(75) { rules.update(flex, 20L) }
+        repeat(50) { rules.update(rest, 20L) }
+        repeat(80) { rules.update(flex, 20L) }              // добирает оставшиеся 0,5 с запасом
         assertTrue(rules.isDone)
     }
 }

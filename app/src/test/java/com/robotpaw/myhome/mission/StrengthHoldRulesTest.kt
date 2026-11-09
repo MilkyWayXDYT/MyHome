@@ -1,7 +1,5 @@
-package com.robotpaw.myhome.mission
+package com.robotpaw.myhome.mission.mechanics.strength
 
-import com.robotpaw.myhome.mission.mechanics.strength.StrengthHoldConfig
-import com.robotpaw.myhome.mission.mechanics.strength.StrengthHoldRules
 import com.robotpaw.myhome.signal.calculateSignalState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -105,5 +103,17 @@ class StrengthHoldRulesTest {
         repeat(10) { rules.update(strong, 20L) }                          // ещё 0,2 с при нужных 0,1 с
         assertTrue(rules.isDone)
         assertFalse(rules.progress < 1f)
+    }
+
+    @Test
+    fun novice_progressNeverGoesBack_butDropIsStillCounted() {
+        val rules = StrengthHoldRules(config(), keepProgress = true)
+        repeat(25) { rules.update(strong, 20L) }            // 0,5
+        val before = rules.progress
+        var drops = 0
+        repeat(60) { if (rules.update(rest, 20L).drop) drops++ }
+        repeat(10) { rules.update(both, 20L) }
+        assertEquals(before, rules.progress, 0f)
+        assertEquals(1, drops)
     }
 }

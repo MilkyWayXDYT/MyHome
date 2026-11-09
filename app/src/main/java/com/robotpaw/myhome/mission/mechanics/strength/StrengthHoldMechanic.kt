@@ -1,5 +1,8 @@
 package com.robotpaw.myhome.mission.mechanics.strength
 
+import com.robotpaw.myhome.mission.mechanics.core.rememberMechanicInput
+import com.robotpaw.myhome.mission.mechanics.core.MechanicAttempt
+import com.robotpaw.myhome.mission.mechanics.core.MissionRecorder
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -13,12 +16,10 @@ import com.robotpaw.myhome.game.Mission
 import com.robotpaw.myhome.game.MissionCheckpoint
 import com.robotpaw.myhome.game.MissionLog
 import com.robotpaw.myhome.mission.MissionObject
-import com.robotpaw.myhome.mission.mechanics.core.MechanicAttempt
-import com.robotpaw.myhome.mission.mechanics.core.MissionRecorder
-import com.robotpaw.myhome.mission.mechanics.core.rememberMechanicInput
 import com.robotpaw.myhome.signal.Channel
 import com.robotpaw.myhome.signal.SignalProfile
 import com.robotpaw.myhome.signal.SignalSource
+import com.robotpaw.myhome.signal.UserLevel
 import com.robotpaw.myhome.ui.components.HomeCard
 import com.robotpaw.myhome.ui.components.HomeScreen
 import com.robotpaw.myhome.ui.components.ProgressStrip
@@ -45,7 +46,7 @@ fun StrengthHoldMechanic(
     onDone: (MissionLog) -> Unit,
     onPause: (MissionCheckpoint) -> Unit
 ) {
-    val rules = remember { StrengthHoldRules(config).apply { restore(checkpoint.progress) } }
+    val rules = remember { StrengthHoldRules(config, keepProgress = profile.level == UserLevel.NOVICE).apply { restore(checkpoint.progress) } }
     val recorder = remember { MissionRecorder(checkpoint.log) }
     val attempt = remember { MechanicAttempt() }
     var progress by remember { mutableFloatStateOf(checkpoint.progress) }
@@ -66,12 +67,7 @@ fun StrengthHoldMechanic(
             attempt.finished = true
             val firstTime = recorder.snapshot().pauses == 0
             recorder.addPause()
-            onPause(
-                MissionCheckpoint(
-                    progress = if (firstTime) rules.progress else 0f,
-                    log = recorder.snapshot()
-                )
-            )
+            onPause(MissionCheckpoint(progress = if (firstTime) rules.progress else 0f, log = recorder.snapshot()))
         }
     }
     val state = input.state

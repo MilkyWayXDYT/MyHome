@@ -33,10 +33,14 @@ data class StrengthHoldEvent(val done: Boolean = false, val drop: Boolean = fals
 
 /**
  * Правила заданий на силу и удержание (мусор, пылесос, зеркало)
+ * @param keepProgress - прогресс не откатывается назад (для новичка): отпустил или напряг оба канала, полоса остаётся
  * Прогресс идёт, пока напряжён только сгибатель и его сила не ниже minStrength
  * Чистая логика без Compose, чтобы проверять юнит-тестами
  */
-class StrengthHoldRules(private val config: StrengthHoldConfig) {
+class StrengthHoldRules(
+    private val config: StrengthHoldConfig,
+    private val keepProgress: Boolean = false
+) {
 
     var progress: Float = 0f
         private set
@@ -70,7 +74,7 @@ class StrengthHoldRules(private val config: StrengthHoldConfig) {
                     drop = config.dropIsError
                 }
             }
-            progress -= if (state.isCoContraction) step else step * config.decayRate
+            if (!keepProgress) progress -= if (state.isCoContraction) step else step * config.decayRate
         }
         progress = progress.coerceIn(0f, 1f)
         return StrengthHoldEvent(done = isDone, drop = drop)
