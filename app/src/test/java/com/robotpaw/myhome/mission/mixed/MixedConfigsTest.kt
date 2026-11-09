@@ -45,4 +45,13 @@ class MixedConfigsTest {
         assertEquals(2, MixedConfigs.PANCAKES.steps.count { it.rest })
         assertTrue(MixedConfigs.LAUNDRY.steps.any { (it.zone?.first ?: 0) >= 60 })
     }
+
+    @Test
+    fun pancakes_startWithMixing_beforeFrying() {
+        val steps = MixedConfigs.PANCAKES.steps
+        val firstRest = steps.indexOfFirst { it.rest }
+        val mixingSteps = steps.take(firstRest).count { it.text.contains("Замешивайте") }
+        assertEquals(6, mixingSteps)
+        assertTrue(steps.first().text.contains("венчик"))
+    }
 }

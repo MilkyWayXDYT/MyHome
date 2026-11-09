@@ -25,9 +25,18 @@ object MixedConfigs {
         attemptLimitMs = 60_000L
     )
 
-    // Блинчики (сложное): тонкая струйка теста, жарка (покой), перевернуть и переложить аккуратно («Нежное касание»)
+    // Блинчики (сложное): замесить тесто (быстрое чередование, три круга), налить тонкой струйкой,
+    // пожарить (покой), перевернуть и переложить аккуратно («Нежное касание»)
     val PANCAKES = AlternationConfig(
         steps = listOf(
+            AlternationStep(Channel.FLEXOR, 800L, "Сожмите кисть: возьмите венчик")
+        ) + (1..3).flatMap { n ->
+            listOf(
+                AlternationStep(Channel.EXTENSOR, 600L, "Замешивайте, круг $n из 3: разожмите"),
+                AlternationStep(Channel.FLEXOR, 600L, "Замешивайте, круг $n из 3: сожмите")
+            )
+        } + listOf(
+            AlternationStep(Channel.EXTENSOR, 800L, "Разожмите кисть: положите венчик"),
             AlternationStep(Channel.FLEXOR, 2000L, "Сожмите мягко: налейте тесто тонкой струйкой", zone = 30..50),
             AlternationStep(Channel.EXTENSOR, 1000L, "Разожмите кисть: уберите половник"),
             AlternationStep(Channel.FLEXOR, 2500L, "Расслабьте руку: блин жарится", rest = true),
@@ -37,7 +46,7 @@ object MixedConfigs {
             AlternationStep(Channel.FLEXOR, 1000L, "Сожмите осторожно: переложите на тарелку", zone = 30..55),
             AlternationStep(Channel.EXTENSOR, 1000L, "Разожмите мягко: отпустите блин", zone = 30..50)
         ),
-        attemptLimitMs = 70_000L
+        attemptLimitMs = 90_000L
     )
 
     val ALL = listOf(LAUNDRY, PANCAKES)
