@@ -1,5 +1,9 @@
 package com.robotpaw.myhome.mission.mechanics.alternation
 
+import com.robotpaw.myhome.mission.mechanics.core.rememberMechanicInput
+import com.robotpaw.myhome.mission.mechanics.core.MechanicAttempt
+import com.robotpaw.myhome.mission.mechanics.core.MissionRecorder
+import com.robotpaw.myhome.mission.mechanics.core.ZoneGauge
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -14,9 +18,6 @@ import com.robotpaw.myhome.game.Mission
 import com.robotpaw.myhome.game.MissionCheckpoint
 import com.robotpaw.myhome.game.MissionLog
 import com.robotpaw.myhome.mission.MissionObject
-import com.robotpaw.myhome.mission.mechanics.core.MechanicAttempt
-import com.robotpaw.myhome.mission.mechanics.core.MissionRecorder
-import com.robotpaw.myhome.mission.mechanics.core.rememberMechanicInput
 import com.robotpaw.myhome.signal.Channel
 import com.robotpaw.myhome.signal.SignalProfile
 import com.robotpaw.myhome.signal.SignalSource
@@ -73,16 +74,16 @@ fun AlternationMechanic(
             attempt.finished = true
             val firstTime = recorder.snapshot().pauses == 0
             recorder.addPause()
-            onPause(
-                MissionCheckpoint(
-                    progress = if (firstTime) rules.progress else 0f,
-                    log = recorder.snapshot()
-                )
-            )
+            onPause(MissionCheckpoint(progress = if (firstTime) rules.progress else 0f, log = recorder.snapshot()))
         }
     }
     val state = input.state
     val step = config.steps.getOrNull(stepIndex)
+    val zone = step?.zone
+    val stepColor = if (step?.channel == Channel.EXTENSOR) HomeColors.Extensor else HomeColors.Flexor
+    val strengthNow = if (step?.channel == Channel.EXTENSOR) state.extensorStrength else state.flexorStrength
+    val onlyRequired = step != null && state.code == (if (step.channel == Channel.EXTENSOR) "01" else "10")
+    val tooWeak = onlyRequired && zone != null && strengthNow < zone.first
 
     HomeScreen(
         title = mission.title,
@@ -91,7 +92,8 @@ fun AlternationMechanic(
         MissionObject(mission.kind, progress = total, modifier = Modifier.weight(1f))
         HomeCard {
             Text(
-                "Шаг ${(stepIndex + 1).coerceAtMost(config.steps.size)} из ${config.steps.size}",
+                "Шаг ${(stepIndex + 1).coerceAtMost(config.steps.size)} из ${config.steps.size}" +
+                        if (zone != null) " · держите силу ${zone.first}–${zone.last}%" else "",
                 fontSize = HomeType.Label, color = HomeColors.InkSecondary
             )
             Text(
@@ -99,16 +101,14 @@ fun AlternationMechanic(
                 fontSize = HomeType.Heading, fontWeight = FontWeight.ExtraBold, color = HomeColors.Ink
             )
         }
-        ProgressStrip(
-            stepProgress,
-            if (step?.channel == Channel.EXTENSOR) HomeColors.Extensor else HomeColors.Flexor,
-            height = 16.dp
-        )
+        if (zone != null) ZoneGauge(strengthNow, zone, stepColor)
+        ProgressStrip(stepProgress, stepColor, height = 16.dp)
         WarningLine(
             when {
                 !input.armed -> null
                 state.isCoContraction -> "Напряжены оба канала. Оставьте только нужный"
                 rules.isOvershooting -> "Слишком сильно. Ослабьте нажим"
+                tooWeak -> "Слишком слабо. Нажмите сильнее"
                 else -> null
             }
         )
