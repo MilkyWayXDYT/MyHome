@@ -21,6 +21,7 @@ import com.robotpaw.myhome.signal.SignalSource
 object Mechanics {
     val implemented: Set<MissionKind> = setOf(
         MissionKind.DOOR,
+        MissionKind.CUBES,
         MissionKind.PICTURE,
         MissionKind.PILLOWS,
         MissionKind.TRASH,
@@ -30,7 +31,8 @@ object Mechanics {
         MissionKind.FLOWER,
         MissionKind.TOWEL,
         MissionKind.CLOTHESPINS,
-        MissionKind.TEA
+        MissionKind.TEA,
+        MissionKind.TABLE
     )
 
     fun has(kind: MissionKind): Boolean = kind in implemented
@@ -81,6 +83,12 @@ fun MissionMechanic(
         )
         MissionKind.TEA -> AlternationMechanic(
             source, profile, roomTitle, mission, PrecisionConfigs.TEA, checkpoint, onDone, onPause
+        )
+        MissionKind.CUBES -> AlternationMechanic(
+            source, profile, roomTitle, mission, AlternationConfigs.CUBES, checkpoint, onDone, onPause
+        )
+        MissionKind.TABLE -> AlternationMechanic(
+            source, profile, roomTitle, mission, AlternationConfigs.TABLE, checkpoint, onDone, onPause
         )
         else -> Unit
     }
