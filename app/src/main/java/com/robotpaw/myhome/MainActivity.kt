@@ -15,6 +15,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.robotpaw.myhome.developer.ComponentGallery
 import com.robotpaw.myhome.developer.EmulatorPads
+import com.robotpaw.myhome.developer.LevelSwitcher
+import com.robotpaw.myhome.developer.withAllCompleted
+import com.robotpaw.myhome.developer.withCompletedBefore
 import com.robotpaw.myhome.developer.SignalOverlay
 import android.view.InputDevice
 import android.view.KeyEvent
@@ -253,7 +256,7 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
                 onBack = { screen = Screen.MainMenu }
             )
 
-            is Screen.Room -> RoomScreen(
+            is Screen.Room -> key(current.roomId, current.wall) { RoomScreen(
                 source = emulator,
                 profile = profile,
                 room = Rooms.byId(current.roomId),
@@ -261,7 +264,7 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
                 initialWall = current.wall,
                 onStart = { screen = Screen.Instruction(it) },
                 onBack = { screen = Screen.MainMenu }
-            )
+            ) }
 
             is Screen.Instruction -> InstructionScreen(
                 source = emulator,
@@ -271,7 +274,7 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
                 onBack = { screen = roomScreenOf(current.mission) }
             )
 
-            is Screen.Play -> MissionScreen(
+            is Screen.Play -> key(current.mission.id) { MissionScreen(
                 source = emulator,
                 profile = profile,
                 roomTitle = Rooms.of(current.mission).title,
@@ -284,7 +287,7 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
                     screen = Screen.Result(result, roomCompleted = !wasDone && progress.isDone(room))
                 },
                 onPause = { checkpoint -> screen = Screen.Pause(current.mission, checkpoint) }
-            )
+            ) }
 
             is Screen.Pause -> PauseScreen(
                 source = emulator,
@@ -340,6 +343,24 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
                     .padding(end = 8.dp)
+            )
+        }
+
+        // Быстрый переход по комнатам и заданиям (только debug)
+        if (isDebug) {
+            LevelSwitcher(
+                progress = progress,
+                onJumpToMission = { screen = Screen.Play(it) },
+                onJumpToRoom = { room ->
+                    progress = progress.withCompletedBefore(room)
+                    screen = Screen.Room(room.id)
+                },
+                onUnlockAll = { progress = progress.withAllCompleted() },
+                onReset = { progress = GameProgress() },
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .navigationBarsPadding()
+                    .padding(8.dp)
             )
         }
 
