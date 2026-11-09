@@ -5,6 +5,8 @@ import com.robotpaw.myhome.mission.mechanics.alternation.AlternationConfigs
 import com.robotpaw.myhome.mission.mechanics.alternation.AlternationMechanic
 import com.robotpaw.myhome.mission.mechanics.door.DoorMechanic
 import com.robotpaw.myhome.mission.mechanics.mixed.MixedConfigs
+import com.robotpaw.myhome.mission.mechanics.pet.PetChoiceMechanic
+import com.robotpaw.myhome.mission.mechanics.pet.PetConfigs
 import com.robotpaw.myhome.mission.mechanics.precision.PrecisionConfigs
 import com.robotpaw.myhome.mission.mechanics.rhythm.RhythmConfigs
 import com.robotpaw.myhome.mission.mechanics.rhythm.RhythmMechanic
@@ -14,6 +16,7 @@ import com.robotpaw.myhome.game.Mission
 import com.robotpaw.myhome.game.MissionCheckpoint
 import com.robotpaw.myhome.game.MissionKind
 import com.robotpaw.myhome.game.MissionLog
+import com.robotpaw.myhome.game.PetKind
 import com.robotpaw.myhome.signal.SignalProfile
 import com.robotpaw.myhome.signal.SignalSource
 
@@ -38,7 +41,11 @@ object Mechanics {
         MissionKind.TABLE,
         MissionKind.SALAD,
         MissionKind.LAUNDRY,
-        MissionKind.PANCAKES
+        MissionKind.PANCAKES,
+        MissionKind.PET_CHOICE,
+        MissionKind.PET_TOY,
+        MissionKind.PET_BOWL,
+        MissionKind.PET_FOOD
     )
 
     fun has(kind: MissionKind): Boolean = kind in implemented
@@ -47,6 +54,7 @@ object Mechanics {
 /**
  * Выбирает механику по виду задания. Контракт у всех механик одинаковый:
  * слушает сигнал, по завершении вызывает onDone с логом, когда игроку нужна пауза - onPause с чекпоинтом
+ * pet - выбранный питомец (тексты финала), onPetChosen - выбор питомца в задании «Питомец»
  */
 @Composable
 fun MissionMechanic(
@@ -56,7 +64,9 @@ fun MissionMechanic(
     mission: Mission,
     checkpoint: MissionCheckpoint,
     onDone: (MissionLog) -> Unit,
-    onPause: (MissionCheckpoint) -> Unit
+    onPause: (MissionCheckpoint) -> Unit,
+    pet: PetKind = PetKind.CAT,
+    onPetChosen: (PetKind) -> Unit = {}
 ) {
     when (mission.kind) {
         MissionKind.DOOR -> DoorMechanic(source, profile, roomTitle, mission, checkpoint, onDone, onPause)
@@ -104,6 +114,16 @@ fun MissionMechanic(
         )
         MissionKind.PANCAKES -> AlternationMechanic(
             source, profile, roomTitle, mission, MixedConfigs.PANCAKES, checkpoint, onDone, onPause
+        )
+        MissionKind.PET_CHOICE -> PetChoiceMechanic(source, profile, roomTitle, mission, onPetChosen, onDone)
+        MissionKind.PET_TOY -> AlternationMechanic(
+            source, profile, roomTitle, mission, PetConfigs.toy(pet), checkpoint, onDone, onPause
+        )
+        MissionKind.PET_BOWL -> AlternationMechanic(
+            source, profile, roomTitle, mission, PetConfigs.bowl(pet), checkpoint, onDone, onPause
+        )
+        MissionKind.PET_FOOD -> AlternationMechanic(
+            source, profile, roomTitle, mission, PetConfigs.food(pet), checkpoint, onDone, onPause
         )
         else -> Unit
     }

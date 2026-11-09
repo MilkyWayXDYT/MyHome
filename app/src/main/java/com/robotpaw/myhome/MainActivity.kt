@@ -32,6 +32,7 @@ import com.robotpaw.myhome.game.GameProgress
 import com.robotpaw.myhome.game.Mission
 import com.robotpaw.myhome.game.MissionCheckpoint
 import com.robotpaw.myhome.game.MissionResult
+import com.robotpaw.myhome.game.PetKind
 import com.robotpaw.myhome.game.Rooms
 import com.robotpaw.myhome.menu.RoomScreen
 import com.robotpaw.myhome.developer.SignalCheckScreen
@@ -286,7 +287,9 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
                     progress = progress.withCompleted(current.mission)
                     screen = Screen.Result(result, roomCompleted = !wasDone && progress.isDone(room))
                 },
-                onPause = { checkpoint -> screen = Screen.Pause(current.mission, checkpoint) }
+                onPause = { checkpoint -> screen = Screen.Pause(current.mission, checkpoint) },
+                pet = progress.pet ?: PetKind.CAT,
+                onPetChosen = { progress = progress.withPet(it) }
             ) }
 
             is Screen.Pause -> PauseScreen(

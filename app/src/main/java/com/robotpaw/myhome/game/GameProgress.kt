@@ -1,9 +1,14 @@
 package com.robotpaw.myhome.game
 
 /**
- * Пройденные задания (только в памяти)
+ * Пройденные задания и выбранный питомец (только в памяти)
  */
-data class GameProgress(val completedMissions: Set<String> = emptySet()) {
+data class GameProgress(
+    val completedMissions: Set<String> = emptySet(),
+    val pet: PetKind? = null
+) {
+
+    fun withPet(pet: PetKind) = copy(pet = pet)
 
     fun withCompleted(mission: Mission) = copy(completedMissions = completedMissions + mission.id)
 

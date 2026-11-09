@@ -16,6 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.robotpaw.myhome.game.Mission
 import com.robotpaw.myhome.game.MissionCheckpoint
+import com.robotpaw.myhome.game.PetKind
 import com.robotpaw.myhome.game.MissionResult
 import com.robotpaw.myhome.menu.MenuItem
 import com.robotpaw.myhome.menu.MenuList
@@ -74,6 +75,8 @@ fun InstructionScreen(
  * Экран задания: если у вида задания есть механика, запускает её, иначе показывает заглушку
  * @param checkpoint - откуда продолжаем после паузы
  * @param onPause - окно поддержки; чекпоинт вернётся в этот экран, если игрок выберет «Продолжить»
+ * @param pet - выбранный питомец (для заданий финала)
+ * @param onPetChosen - игрок выбрал питомца в задании «Питомец»
  */
 @Composable
 fun MissionScreen(
@@ -83,7 +86,9 @@ fun MissionScreen(
     mission: Mission,
     checkpoint: MissionCheckpoint,
     onDone: (MissionResult) -> Unit,
-    onPause: (MissionCheckpoint) -> Unit
+    onPause: (MissionCheckpoint) -> Unit,
+    pet: PetKind = PetKind.CAT,
+    onPetChosen: (PetKind) -> Unit = {}
 ) {
     if (Mechanics.has(mission.kind)) {
         MissionMechanic(
@@ -93,7 +98,9 @@ fun MissionScreen(
             mission = mission,
             checkpoint = checkpoint,
             onDone = { log -> onDone(MissionResult(mission, log)) },
-            onPause = onPause
+            onPause = onPause,
+            pet = pet,
+            onPetChosen = onPetChosen
         )
     } else {
         StubMission(source, profile, roomTitle, mission, onDone) { onPause(checkpoint) }
