@@ -21,6 +21,7 @@ import com.robotpaw.myhome.mission.MissionObject
 import com.robotpaw.myhome.signal.Channel
 import com.robotpaw.myhome.signal.SignalProfile
 import com.robotpaw.myhome.signal.SignalSource
+import com.robotpaw.myhome.signal.UserLevel
 import com.robotpaw.myhome.ui.components.HomeCard
 import com.robotpaw.myhome.ui.components.HomeScreen
 import com.robotpaw.myhome.ui.components.ProgressStrip
@@ -47,7 +48,7 @@ fun AlternationMechanic(
     onDone: (MissionLog) -> Unit,
     onPause: (MissionCheckpoint) -> Unit
 ) {
-    val rules = remember { AlternationRules(config.steps).apply { restore(checkpoint.progress) } }
+    val rules = remember { AlternationRules(config.steps, keepProgress = profile.level == UserLevel.NOVICE).apply { restore(checkpoint.progress) } }
     val recorder = remember { MissionRecorder(checkpoint.log) }
     val attempt = remember { MechanicAttempt() }
 

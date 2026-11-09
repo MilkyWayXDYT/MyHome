@@ -1,7 +1,5 @@
-package com.robotpaw.myhome.mission
+package com.robotpaw.myhome.mission.mechanics.alternation
 
-import com.robotpaw.myhome.mission.mechanics.alternation.AlternationRules
-import com.robotpaw.myhome.mission.mechanics.alternation.AlternationStep
 import com.robotpaw.myhome.signal.Channel
 import com.robotpaw.myhome.signal.calculateSignalState
 import org.junit.Assert.assertEquals
@@ -93,5 +91,33 @@ class AlternationRulesTest {
         assertEquals(1, rules.stepIndex)
         assertEquals(0.5f, rules.stepProgress, 0.01f)
         assertFalse(rules.isDone)
+    }
+
+    @Test
+    fun novice_stepProgressNeverGoesBack() {
+        val rules = AlternationRules(
+            listOf(AlternationStep(Channel.FLEXOR, 1000L, "сжать")),
+            keepProgress = true
+        )
+        repeat(25) { rules.update(flex, 20L) }              // 0,5
+        repeat(100) { rules.update(rest, 20L) }             // покой
+        repeat(50) { rules.update(both, 20L) }              // встречный сигнал
+        assertEquals(0.5f, rules.stepProgress, 0.01f)
+    }
+
+    @Test
+    fun novice_overshootIsStillReported_butProgressStaysAndDoesNotGrow() {
+        val soft = calculateSignalState(0, 50)
+        val hard = calculateSignalState(0, 100)
+        val zone = (soft.extensorStrength - 5)..(soft.extensorStrength + 5)
+        val rules = AlternationRules(
+            listOf(AlternationStep(Channel.EXTENSOR, 1000L, "мягко", zone)),
+            keepProgress = true
+        )
+        repeat(20) { rules.update(soft, 20L) }              // 0,4
+        var overshoots = 0
+        repeat(20) { if (rules.update(hard, 20L).overshoot) overshoots++ }
+        assertEquals(1, overshoots)
+        assertEquals(0.4f, rules.stepProgress, 0.01f)
     }
 }

@@ -29,10 +29,12 @@ data class AlternationEvent(val stepCompleted: Boolean = false, val overshoot: B
  * Игрок проходит шаги по порядку. Шаг идёт, пока напряжён только нужный канал (и сила в зоне, если она задана)
  * Чистая логика без Compose, чтобы проверять юнит-тестами
  * @param decayRate - во сколько раз прогресс шага убывает медленнее, чем растёт, когда игрок расслабился
+ * @param keepProgress - прогресс не откатывается назад (для новичка): расслабился, перебор силы или встречный сигнал - полоса остаётся
  */
 class AlternationRules(
     val steps: List<AlternationStep>,
-    private val decayRate: Float = 0.5f
+    private val decayRate: Float = 0.5f,
+    private val keepProgress: Boolean = false
 ) {
     var stepIndex: Int = 0
         private set
@@ -82,6 +84,7 @@ class AlternationRules(
 
         stepProgress += when {
             inZone -> delta
+            keepProgress -> 0f                                 // новичок: прогресс не откатывается
             tooStrong || state.isCoContraction -> -delta       // перебор или встречный сигнал: падает так же быстро, как растёт
             else -> -delta * decayRate                         // расслабился или напряжён другой канал
         }
