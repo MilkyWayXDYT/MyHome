@@ -120,4 +120,20 @@ class AlternationRulesTest {
         assertEquals(1, overshoots)
         assertEquals(0.4f, rules.stepProgress, 0.01f)
     }
+
+    @Test
+    fun restStep_needsRelaxedHand() {
+        val rules = AlternationRules(
+            listOf(
+                AlternationStep(Channel.FLEXOR, 500L, "сжать"),
+                AlternationStep(Channel.FLEXOR, 500L, "ждать", rest = true)
+            )
+        )
+        repeat(27) { rules.update(flex, 20L) }              // первый шаг
+        assertEquals(1, rules.stepIndex)
+        repeat(30) { rules.update(flex, 20L) }              // рука всё ещё сжата, жарка не идёт
+        assertEquals(1, rules.stepIndex)
+        repeat(27) { rules.update(rest, 20L) }              // расслабилась
+        assertTrue(rules.isDone)
+    }
 }

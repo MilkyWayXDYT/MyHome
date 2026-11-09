@@ -12,6 +12,7 @@ package com.robotpaw.myhome.game
  * @param peakStrength - максимальная сила нужного канала (0..100)
  * @param strengthSum - сумма силы по кадрам, пока канал активен
  * @param strengthFrames - число кадров, пока канал активен
+ * @param bestStreak - лучшая серия попаданий подряд (ритм-задания, миссия «В ритм»)
  */
 data class MissionLog(
     val durationMs: Long = 0L,
@@ -22,7 +23,8 @@ data class MissionLog(
     val pauses: Int = 0,
     val peakStrength: Int = 0,
     val strengthSum: Long = 0L,
-    val strengthFrames: Int = 0
+    val strengthFrames: Int = 0,
+    val bestStreak: Int = 0
 ) {
     // средняя сила нужного канала, пока он был активен (0..100)
     val averageStrength: Int

@@ -43,6 +43,11 @@ class MissionRecorder(start: MissionLog = MissionLog()) {
         log = log.copy(errors = log.errors + 1)
     }
 
+    // запоминает лучшую серию попаданий подряд
+    fun recordStreak(streak: Int) {
+        if (streak > log.bestStreak) log = log.copy(bestStreak = streak)
+    }
+
     fun addPause() {
         log = log.copy(pauses = log.pauses + 1)
     }

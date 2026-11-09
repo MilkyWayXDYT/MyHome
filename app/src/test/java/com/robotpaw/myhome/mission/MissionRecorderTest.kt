@@ -1,6 +1,5 @@
-package com.robotpaw.myhome.mission
+package com.robotpaw.myhome.mission.mechanics.core
 
-import com.robotpaw.myhome.mission.mechanics.core.MissionRecorder
 import com.robotpaw.myhome.signal.Channel
 import com.robotpaw.myhome.signal.calculateSignalState
 import org.junit.Assert.assertEquals
@@ -54,5 +53,14 @@ class MissionRecorderTest {
         repeat(10) { second.onFrame(flex, 20L, Channel.FLEXOR) }
         assertEquals(400L, second.snapshot().durationMs)
         assertEquals(1, second.snapshot().pauses)
+    }
+
+    @Test
+    fun recordStreak_keepsBestOnly() {
+        val recorder = MissionRecorder()
+        recorder.recordStreak(3)
+        recorder.recordStreak(1)
+        recorder.recordStreak(5)
+        assertEquals(5, recorder.snapshot().bestStreak)
     }
 }

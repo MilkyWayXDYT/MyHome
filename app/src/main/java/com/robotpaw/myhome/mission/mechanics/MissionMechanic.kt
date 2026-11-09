@@ -4,7 +4,10 @@ import androidx.compose.runtime.Composable
 import com.robotpaw.myhome.mission.mechanics.alternation.AlternationConfigs
 import com.robotpaw.myhome.mission.mechanics.alternation.AlternationMechanic
 import com.robotpaw.myhome.mission.mechanics.door.DoorMechanic
+import com.robotpaw.myhome.mission.mechanics.mixed.MixedConfigs
 import com.robotpaw.myhome.mission.mechanics.precision.PrecisionConfigs
+import com.robotpaw.myhome.mission.mechanics.rhythm.RhythmConfigs
+import com.robotpaw.myhome.mission.mechanics.rhythm.RhythmMechanic
 import com.robotpaw.myhome.mission.mechanics.strength.StrengthHoldConfigs
 import com.robotpaw.myhome.mission.mechanics.strength.StrengthHoldMechanic
 import com.robotpaw.myhome.game.Mission
@@ -32,7 +35,10 @@ object Mechanics {
         MissionKind.TOWEL,
         MissionKind.CLOTHESPINS,
         MissionKind.TEA,
-        MissionKind.TABLE
+        MissionKind.TABLE,
+        MissionKind.SALAD,
+        MissionKind.LAUNDRY,
+        MissionKind.PANCAKES
     )
 
     fun has(kind: MissionKind): Boolean = kind in implemented
@@ -89,6 +95,15 @@ fun MissionMechanic(
         )
         MissionKind.TABLE -> AlternationMechanic(
             source, profile, roomTitle, mission, AlternationConfigs.TABLE, checkpoint, onDone, onPause
+        )
+        MissionKind.SALAD -> RhythmMechanic(
+            source, profile, roomTitle, mission, RhythmConfigs.SALAD, checkpoint, onDone, onPause
+        )
+        MissionKind.LAUNDRY -> AlternationMechanic(
+            source, profile, roomTitle, mission, MixedConfigs.LAUNDRY, checkpoint, onDone, onPause
+        )
+        MissionKind.PANCAKES -> AlternationMechanic(
+            source, profile, roomTitle, mission, MixedConfigs.PANCAKES, checkpoint, onDone, onPause
         )
         else -> Unit
     }

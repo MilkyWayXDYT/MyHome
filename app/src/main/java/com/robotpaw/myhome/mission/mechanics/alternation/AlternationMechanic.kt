@@ -59,7 +59,7 @@ fun AlternationMechanic(
     val input = rememberMechanicInput(source, profile) { state, dt ->
         if (attempt.finished) return@rememberMechanicInput
 
-        recorder.onFrame(state, dt, rules.current?.channel)
+        recorder.onFrame(state, dt, rules.current?.takeIf { !it.rest }?.channel)
         val event = rules.update(state, dt)
         if (event.overshoot) recorder.addError()
 
@@ -81,7 +81,11 @@ fun AlternationMechanic(
     val state = input.state
     val step = config.steps.getOrNull(stepIndex)
     val zone = step?.zone
-    val stepColor = if (step?.channel == Channel.EXTENSOR) HomeColors.Extensor else HomeColors.Flexor
+    val stepColor = when {
+        step?.rest == true -> HomeColors.InkSecondary
+        step?.channel == Channel.EXTENSOR -> HomeColors.Extensor
+        else -> HomeColors.Flexor
+    }
     val strengthNow = if (step?.channel == Channel.EXTENSOR) state.extensorStrength else state.flexorStrength
     val onlyRequired = step != null && state.code == (if (step.channel == Channel.EXTENSOR) "01" else "10")
     val tooWeak = onlyRequired && zone != null && strengthNow < zone.first
@@ -107,6 +111,7 @@ fun AlternationMechanic(
         WarningLine(
             when {
                 !input.armed -> null
+                step?.rest == true && !state.isRest -> "Расслабьте руку и подождите"
                 state.isCoContraction -> "Напряжены оба канала. Оставьте только нужный"
                 rules.isOvershooting -> "Слишком сильно. Ослабьте нажим"
                 tooWeak -> "Слишком слабо. Нажмите сильнее"

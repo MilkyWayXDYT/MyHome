@@ -9,12 +9,14 @@ import com.robotpaw.myhome.signal.SignalState
  * @param holdMs - сколько держать, чтобы шаг засчитался
  * @param text - подсказка игроку
  * @param zone - допустимая сила канала в процентах; null - любая. Выше зоны - перебор, ниже - не засчитывается
+ * @param rest - шаг на расслабление: нужно держать покой (код 00), канал и зона не важны (блин жарится)
  */
 data class AlternationStep(
     val channel: Channel,
     val holdMs: Long,
     val text: String,
-    val zone: IntRange? = null
+    val zone: IntRange? = null,
+    val rest: Boolean = false
 )
 
 /**
@@ -67,7 +69,7 @@ class AlternationRules(
         val step = current ?: return AlternationEvent()
         val delta = dtMs.toFloat() / step.holdMs
 
-        val onlyRequired = when (step.channel) {
+        val onlyRequired = if (step.rest) state.isRest else when (step.channel) {
             Channel.FLEXOR -> state.code == "10"
             Channel.EXTENSOR -> state.code == "01"
         }
@@ -76,8 +78,8 @@ class AlternationRules(
             Channel.EXTENSOR -> state.extensorStrength
         }
         val zone = step.zone
-        val tooStrong = onlyRequired && zone != null && strength > zone.last
-        val inZone = onlyRequired && (zone == null || strength in zone)
+        val tooStrong = !step.rest && onlyRequired && zone != null && strength > zone.last
+        val inZone = onlyRequired && (step.rest || zone == null || strength in zone)
 
         val overshoot = tooStrong && !isOvershooting
         isOvershooting = tooStrong
