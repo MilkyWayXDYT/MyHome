@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -18,7 +19,11 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.robotpaw.myhome.R
 import com.robotpaw.myhome.game.MissionKind
+import com.robotpaw.myhome.game.PetKind
 import com.robotpaw.myhome.ui.theme.HomeColors
+
+// выбранный питомец для картинок: сцены и окна заданий рисуют его (null - питомца ещё нет)
+val LocalPet = staticCompositionLocalOf<PetKind?> { null }
 
 // пропорции всех картинок предметов и сцен (390×520)
 const val ART_RATIO = 390f / 520f
@@ -56,12 +61,18 @@ data class SceneLayer(
 
 /**
  * Сцена комнаты: фон и задания, предметы которых на ней стоят
+ * @param pets - питомец на сцене, свой для каждого (рисуется поверх фона, если питомец выбран)
  */
-data class SceneArt(@DrawableRes val background: Int, val kinds: List<MissionKind>)
+data class SceneArt(
+    @DrawableRes val background: Int,
+    val kinds: List<MissionKind>,
+    val pets: Map<PetKind, Int> = emptyMap()
+)
 
 object RoomScenes {
     private val ALL = listOf(
         SceneArt(R.drawable.scene_bg_door, listOf(MissionKind.DOOR)),
+        SceneArt(R.drawable.scene_bg_cubes, listOf(MissionKind.CUBES)),
         SceneArt(R.drawable.scene_bg_window, listOf(MissionKind.FLOWER)),
         SceneArt(R.drawable.scene_bg_picture, listOf(MissionKind.PICTURE)),
         SceneArt(R.drawable.scene_bg_sofa, listOf(MissionKind.PILLOWS, MissionKind.VACUUM)),
@@ -70,13 +81,22 @@ object RoomScenes {
         SceneArt(R.drawable.scene_bg_tub, listOf(MissionKind.CLOTHESPINS)),
         SceneArt(R.drawable.scene_bg_counter, listOf(MissionKind.TEA, MissionKind.PANCAKES)),
         SceneArt(R.drawable.scene_bg_board, listOf(MissionKind.SALAD, MissionKind.TRASH)),
-        SceneArt(R.drawable.scene_bg_table, listOf(MissionKind.TABLE))
+        SceneArt(R.drawable.scene_bg_table, listOf(MissionKind.TABLE)),
+        SceneArt(R.drawable.scene_bg_petdoor, listOf(MissionKind.PET_CHOICE)),
+        SceneArt(
+            R.drawable.scene_bg_petcorner,
+            listOf(MissionKind.PET_TOY, MissionKind.PET_BOWL, MissionKind.PET_FOOD),
+            pets = mapOf(PetKind.CAT to R.drawable.scene_pet_cat, PetKind.DOG to R.drawable.scene_pet_dog, PetKind.PIG to R.drawable.scene_pet_pig)
+        )
     )
 
     // null - сцены пока нет, рисуется MissionObject
     fun of(kind: MissionKind): SceneArt? = ALL.firstOrNull { kind in it.kinds }
 
-    fun layerOf(kind: MissionKind): SceneLayer? = when (kind) {
+    /**
+     * @param pet - у заданий питомца часть картинок своя для кота, собаки и свиньи
+     */
+    fun layerOf(kind: MissionKind, pet: PetKind? = null): SceneLayer? = when (kind) {
         MissionKind.DOOR -> SceneLayer(R.drawable.scene_door_start, R.drawable.scene_door_done, R.drawable.scene_door_hl, R.drawable.scene_door_hl_done)
         MissionKind.FLOWER -> SceneLayer(R.drawable.scene_flower_start, R.drawable.scene_flower_done, R.drawable.scene_flower_hl, R.drawable.scene_flower_hl_done)
         MissionKind.PICTURE -> SceneLayer(R.drawable.scene_picture_start, R.drawable.scene_picture_done, R.drawable.scene_picture_hl, R.drawable.scene_picture_hl_done)
@@ -92,7 +112,19 @@ object RoomScenes {
         MissionKind.SALAD -> SceneLayer(R.drawable.scene_salad_start, R.drawable.scene_salad_done, R.drawable.scene_salad_hl, R.drawable.scene_salad_hl_done)
         MissionKind.TRASH -> SceneLayer(R.drawable.scene_trash_start, R.drawable.scene_trash_done, R.drawable.scene_trash_hl, R.drawable.scene_trash_hl_done)
         MissionKind.TABLE -> SceneLayer(R.drawable.scene_table_start, R.drawable.scene_table_done, R.drawable.scene_table_hl, R.drawable.scene_table_hl_done)
-        else -> null
+        MissionKind.CUBES -> SceneLayer(R.drawable.scene_cubes_start, R.drawable.scene_cubes_done, R.drawable.scene_cubes_hl, R.drawable.scene_cubes_hl_done)
+        MissionKind.PET_CHOICE -> when (pet) {
+            PetKind.DOG -> SceneLayer(R.drawable.scene_pet_choice_start, R.drawable.scene_pet_choice_done_dog, R.drawable.scene_pet_choice_hl, R.drawable.scene_pet_choice_hl_done_dog)
+            PetKind.PIG -> SceneLayer(R.drawable.scene_pet_choice_start, R.drawable.scene_pet_choice_done_pig, R.drawable.scene_pet_choice_hl, R.drawable.scene_pet_choice_hl_done_pig)
+            else -> SceneLayer(R.drawable.scene_pet_choice_start, R.drawable.scene_pet_choice_done_cat, R.drawable.scene_pet_choice_hl, R.drawable.scene_pet_choice_hl_done_cat)
+        }
+        MissionKind.PET_TOY -> when (pet) {
+            PetKind.DOG -> SceneLayer(R.drawable.scene_pet_toy_start_dog, R.drawable.scene_pet_toy_done_dog, R.drawable.scene_pet_toy_hl_dog, R.drawable.scene_pet_toy_hl_done_dog)
+            PetKind.PIG -> SceneLayer(R.drawable.scene_pet_toy_start_pig, R.drawable.scene_pet_toy_done_pig, R.drawable.scene_pet_toy_hl_pig, R.drawable.scene_pet_toy_hl_done_pig)
+            else -> SceneLayer(R.drawable.scene_pet_toy_start_cat, R.drawable.scene_pet_toy_done_cat, R.drawable.scene_pet_toy_hl_cat, R.drawable.scene_pet_toy_hl_done_cat)
+        }
+        MissionKind.PET_BOWL -> SceneLayer(R.drawable.scene_pet_bowl_start, R.drawable.scene_pet_bowl_done, R.drawable.scene_pet_bowl_hl, R.drawable.scene_pet_bowl_hl_done)
+        MissionKind.PET_FOOD -> SceneLayer(R.drawable.scene_pet_food_start, R.drawable.scene_pet_food_done, R.drawable.scene_pet_food_hl, R.drawable.scene_pet_food_hl_done)
     }
 }
 
@@ -111,10 +143,12 @@ fun RoomSceneView(
     modifier: Modifier = Modifier,
     change: Float? = null
 ) {
+    val pet = LocalPet.current
     ArtFrame(modifier) {
         SceneImage(art.background)
+        pet?.let { art.pets[it] }?.let { SceneImage(it) }
         art.kinds.forEach { kind ->
-            val layer = RoomScenes.layerOf(kind) ?: return@forEach
+            val layer = RoomScenes.layerOf(kind, pet) ?: return@forEach
             if (change != null && kind == selected) {
                 SceneImage(layer.start, alpha = 1f - change)
                 SceneImage(layer.done, alpha = change)
@@ -124,7 +158,7 @@ fun RoomSceneView(
         }
         // обводка только при выборе задания, во время смены предмета её нет
         if (change == null) {
-            RoomScenes.layerOf(selected)?.let { layer ->
+            RoomScenes.layerOf(selected, pet)?.let { layer ->
                 SceneImage(if (isDone(selected)) layer.highlightDone else layer.highlight)
             }
         }

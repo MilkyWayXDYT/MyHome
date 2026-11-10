@@ -47,6 +47,7 @@ import com.robotpaw.myhome.menu.MainMenuChoice
 import com.robotpaw.myhome.menu.MainMenuScreen
 import com.robotpaw.myhome.menu.RoomsScreen
 import com.robotpaw.myhome.mission.InstructionScreen
+import com.robotpaw.myhome.mission.LocalPet
 import com.robotpaw.myhome.mission.MissionScreen
 import com.robotpaw.myhome.mission.PauseChoice
 import com.robotpaw.myhome.mission.PauseScreen
@@ -217,212 +218,215 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
         }
     }
 
-    Box(
-        modifier = Modifier.fillMaxSize()
-    ) {
+    // выбранный питомец нужен картинкам комнат и заданий
+    CompositionLocalProvider(LocalPet provides progress.pet) {
+        Box(
+            modifier = Modifier.fillMaxSize()
+        ) {
 
-        // Экраны
-        when (val current = screen) {
-            Screen.Calibration -> CalibrationScreen(
-                source = emulator,
-                onFinished = {
-                    profile = it
-                    screen = Screen.MainMenu
-                }
-            )
-
-            Screen.MainMenu -> MainMenuScreen(
-                source = emulator,
-                profile = profile,
-                progress = progress,
-                showDeveloperItems = isDebug,
-                onChoice = { choice ->
-                    screen = when (choice) {
-                        MainMenuChoice.CONTINUE -> Screen.Room(progress.currentRoom().id)
-                        MainMenuChoice.ROOMS -> Screen.RoomList
-                        MainMenuChoice.GOALS -> Screen.Goals
-                        MainMenuChoice.SIGNAL_CHECK -> Screen.SignalCheck
-                        MainMenuChoice.RECALIBRATE -> Screen.Calibration
-                        MainMenuChoice.GALLERY -> Screen.Gallery
+            // Экраны
+            when (val current = screen) {
+                Screen.Calibration -> CalibrationScreen(
+                    source = emulator,
+                    onFinished = {
+                        profile = it
+                        screen = Screen.MainMenu
                     }
-                }
-            )
-
-            Screen.Goals -> GoalsScreen(
-                source = emulator,
-                profile = profile,
-                onBack = { screen = Screen.MainMenu }
-            )
-
-            Screen.Gallery -> ComponentGallery(
-                source = emulator,
-                profile = profile,
-                onBack = { screen = Screen.MainMenu }
-            )
-
-            Screen.SignalCheck -> SignalCheckScreen(
-                source = emulator,
-                profile = profile,
-                onExit = { screen = Screen.MainMenu }
-            )
-
-            Screen.RoomList -> RoomsScreen(
-                source = emulator,
-                profile = profile,
-                progress = progress,
-                onOpen = { screen = Screen.Room(it.id) },
-                onBack = { screen = Screen.MainMenu }
-            )
-
-            is Screen.Room -> key(current.roomId, current.wall) { RoomScreen(
-                source = emulator,
-                profile = profile,
-                room = Rooms.byId(current.roomId),
-                progress = progress,
-                initialWall = current.wall,
-                onStart = { screen = Screen.Instruction(it) },
-                onBack = { screen = Screen.MainMenu }
-            ) }
-
-            is Screen.Instruction -> InstructionScreen(
-                source = emulator,
-                profile = profile,
-                mission = current.mission,
-                onStart = { screen = Screen.Play(current.mission) },
-                onBack = { screen = roomScreenOf(current.mission) }
-            )
-
-            is Screen.Play -> key(current.mission.id) { MissionScreen(
-                source = emulator,
-                profile = profile,
-                roomTitle = Rooms.of(current.mission).title,
-                mission = current.mission,
-                checkpoint = current.checkpoint,
-                onDone = { result ->
-                    val room = Rooms.of(current.mission)
-                    val wasDone = progress.isDone(room)
-                    val record = RecordOutcome.of(result, progress.recordOf(current.mission))
-                    val stars = progress.starsFor(result)
-                    progress = progress.withResult(result)
-                    val resultScreen = Screen.Result(result, roomCompleted = !wasDone && progress.isDone(room), record = record, stars = stars)
-                    screen = if (RoomScenes.of(current.mission.kind) != null) Screen.Change(resultScreen) else resultScreen
-                },
-                onPause = { checkpoint -> screen = Screen.Pause(current.mission, checkpoint) },
-                pet = progress.pet ?: PetKind.CAT,
-                onPetChosen = { progress = progress.withPet(it) }
-            ) }
-
-            is Screen.Pause -> PauseScreen(
-                source = emulator,
-                profile = profile,
-                onChoice = { choice ->
-                    screen = when (choice) {
-                        PauseChoice.CONTINUE -> Screen.Play(current.mission, current.checkpoint)
-                        PauseChoice.MENU -> Screen.MainMenu
-                    }
-                }
-            )
-
-            is Screen.Change -> key(current.next.result.mission.id) {
-                val mission = current.next.result.mission
-                val room = Rooms.of(mission)
-                SceneChangeScreen(
-                    mission = mission,
-                    room = room,
-                    isDone = { kind -> room.missions.any { it.kind == kind && progress.isCompleted(it) } },
-                    onFinished = { screen = current.next }
                 )
-            }
 
-            is Screen.Result -> ResultScreen(
-                source = emulator,
-                profile = profile,
-                result = current.result,
-                stats = current.result.log.toStats(),
-                record = current.record,
-                stars = current.stars,
-                onChoice = { choice ->
-                    screen = when (choice) {
-                        ResultChoice.ROOM -> {
-                            val room = Rooms.of(current.result.mission)
-                            val next = Rooms.next(room)
-                            when {
-                                !current.roomCompleted -> roomScreenOf(current.result.mission)
-                                room.restAfter -> Screen.Rest(room.id)
-                                next != null -> Screen.Room(next.id)   // после обучения сразу в гостиную
-                                else -> roomScreenOf(current.result.mission)
-                            }
-                        }
-                        ResultChoice.AGAIN -> Screen.Play(current.result.mission)
-                    }
-                }
-            )
-
-            is Screen.Rest -> {
-                val room = Rooms.byId(current.roomId)
-                val next = Rooms.next(room)
-                RestScreen(
+                Screen.MainMenu -> MainMenuScreen(
                     source = emulator,
                     profile = profile,
-                    roomTitle = room.title,
-                    nextRoomTitle = next?.title,
-                    summary = progress.summaryOf(room),
-                    onNext = { screen = if (next != null) Screen.Room(next.id) else Screen.MainMenu }
+                    progress = progress,
+                    showDeveloperItems = isDebug,
+                    onChoice = { choice ->
+                        screen = when (choice) {
+                            MainMenuChoice.CONTINUE -> Screen.Room(progress.currentRoom().id)
+                            MainMenuChoice.ROOMS -> Screen.RoomList
+                            MainMenuChoice.GOALS -> Screen.Goals
+                            MainMenuChoice.SIGNAL_CHECK -> Screen.SignalCheck
+                            MainMenuChoice.RECALIBRATE -> Screen.Calibration
+                            MainMenuChoice.GALLERY -> Screen.Gallery
+                        }
+                    }
+                )
+
+                Screen.Goals -> GoalsScreen(
+                    source = emulator,
+                    profile = profile,
+                    onBack = { screen = Screen.MainMenu }
+                )
+
+                Screen.Gallery -> ComponentGallery(
+                    source = emulator,
+                    profile = profile,
+                    onBack = { screen = Screen.MainMenu }
+                )
+
+                Screen.SignalCheck -> SignalCheckScreen(
+                    source = emulator,
+                    profile = profile,
+                    onExit = { screen = Screen.MainMenu }
+                )
+
+                Screen.RoomList -> RoomsScreen(
+                    source = emulator,
+                    profile = profile,
+                    progress = progress,
+                    onOpen = { screen = Screen.Room(it.id) },
+                    onBack = { screen = Screen.MainMenu }
+                )
+
+                is Screen.Room -> key(current.roomId, current.wall) { RoomScreen(
+                    source = emulator,
+                    profile = profile,
+                    room = Rooms.byId(current.roomId),
+                    progress = progress,
+                    initialWall = current.wall,
+                    onStart = { screen = Screen.Instruction(it) },
+                    onBack = { screen = Screen.MainMenu }
+                ) }
+
+                is Screen.Instruction -> InstructionScreen(
+                    source = emulator,
+                    profile = profile,
+                    mission = current.mission,
+                    onStart = { screen = Screen.Play(current.mission) },
+                    onBack = { screen = roomScreenOf(current.mission) }
+                )
+
+                is Screen.Play -> key(current.mission.id) { MissionScreen(
+                    source = emulator,
+                    profile = profile,
+                    roomTitle = Rooms.of(current.mission).title,
+                    mission = current.mission,
+                    checkpoint = current.checkpoint,
+                    onDone = { result ->
+                        val room = Rooms.of(current.mission)
+                        val wasDone = progress.isDone(room)
+                        val record = RecordOutcome.of(result, progress.recordOf(current.mission))
+                        val stars = progress.starsFor(result)
+                        progress = progress.withResult(result)
+                        val resultScreen = Screen.Result(result, roomCompleted = !wasDone && progress.isDone(room), record = record, stars = stars)
+                        screen = if (RoomScenes.of(current.mission.kind) != null) Screen.Change(resultScreen) else resultScreen
+                    },
+                    onPause = { checkpoint -> screen = Screen.Pause(current.mission, checkpoint) },
+                    pet = progress.pet ?: PetKind.CAT,
+                    onPetChosen = { progress = progress.withPet(it) }
+                ) }
+
+                is Screen.Pause -> PauseScreen(
+                    source = emulator,
+                    profile = profile,
+                    onChoice = { choice ->
+                        screen = when (choice) {
+                            PauseChoice.CONTINUE -> Screen.Play(current.mission, current.checkpoint)
+                            PauseChoice.MENU -> Screen.MainMenu
+                        }
+                    }
+                )
+
+                is Screen.Change -> key(current.next.result.mission.id) {
+                    val mission = current.next.result.mission
+                    val room = Rooms.of(mission)
+                    SceneChangeScreen(
+                        mission = mission,
+                        room = room,
+                        isDone = { kind -> room.missions.any { it.kind == kind && progress.isCompleted(it) } },
+                        onFinished = { screen = current.next }
+                    )
+                }
+
+                is Screen.Result -> ResultScreen(
+                    source = emulator,
+                    profile = profile,
+                    result = current.result,
+                    stats = current.result.log.toStats(),
+                    record = current.record,
+                    stars = current.stars,
+                    onChoice = { choice ->
+                        screen = when (choice) {
+                            ResultChoice.ROOM -> {
+                                val room = Rooms.of(current.result.mission)
+                                val next = Rooms.next(room)
+                                when {
+                                    !current.roomCompleted -> roomScreenOf(current.result.mission)
+                                    room.restAfter -> Screen.Rest(room.id)
+                                    next != null -> Screen.Room(next.id)   // после обучения сразу в гостиную
+                                    else -> roomScreenOf(current.result.mission)
+                                }
+                            }
+                            ResultChoice.AGAIN -> Screen.Play(current.result.mission)
+                        }
+                    }
+                )
+
+                is Screen.Rest -> {
+                    val room = Rooms.byId(current.roomId)
+                    val next = Rooms.next(room)
+                    RestScreen(
+                        source = emulator,
+                        profile = profile,
+                        roomTitle = room.title,
+                        nextRoomTitle = next?.title,
+                        summary = progress.summaryOf(room),
+                        onNext = { screen = if (next != null) Screen.Room(next.id) else Screen.MainMenu }
+                    )
+                }
+            }
+
+            // Эмулятор доступен только в debug-сборке.
+            // Свёрнут — маленькие кнопки С / Р / С+Р у правого края, развёрнут — большая панель.
+            if (isDebug && !overlayExpanded) {
+                EmulatorPads(
+                    emulator = emulator,
+                    onOpenSettings = { overlayExpanded = true },
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .padding(end = 8.dp)
                 )
             }
-        }
 
-        // Эмулятор доступен только в debug-сборке.
-        // Свёрнут — маленькие кнопки С / Р / С+Р у правого края, развёрнут — большая панель.
-        if (isDebug && !overlayExpanded) {
-            EmulatorPads(
-                emulator = emulator,
-                onOpenSettings = { overlayExpanded = true },
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .padding(end = 8.dp)
-            )
-        }
+            // Быстрый переход по комнатам и заданиям (только debug)
+            if (isDebug) {
+                LevelSwitcher(
+                    progress = progress,
+                    onJumpToMission = { screen = Screen.Play(it) },
+                    onJumpToRoom = { room ->
+                        progress = progress.withCompletedBefore(room)
+                        screen = Screen.Room(room.id)
+                    },
+                    onUnlockAll = { progress = progress.withAllCompleted() },
+                    onReset = { progress = GameProgress() },
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .navigationBarsPadding()
+                        .padding(8.dp)
+                )
+            }
 
-        // Быстрый переход по комнатам и заданиям (только debug)
-        if (isDebug) {
-            LevelSwitcher(
-                progress = progress,
-                onJumpToMission = { screen = Screen.Play(it) },
-                onJumpToRoom = { room ->
-                    progress = progress.withCompletedBefore(room)
-                    screen = Screen.Room(room.id)
-                },
-                onUnlockAll = { progress = progress.withAllCompleted() },
-                onReset = { progress = GameProgress() },
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .navigationBarsPadding()
-                    .padding(8.dp)
-            )
-        }
+            if (isDebug && overlayExpanded) {
 
-        if (isDebug && overlayExpanded) {
+                SignalOverlay(
+                    expanded = overlayExpanded,
 
-            SignalOverlay(
-                expanded = overlayExpanded,
+                    onExpandedChange = {
+                        overlayExpanded = it
+                    },
 
-                onExpandedChange = {
-                    overlayExpanded = it
-                },
+                    emulator = emulator,
+                    stateCode = stateCode,
+                    latencyMs = latencyMs,
 
-                emulator = emulator,
-                stateCode = stateCode,
-                latencyMs = latencyMs,
-
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .statusBarsPadding()
-                    .padding(
-                        horizontal = 12.dp,
-                        vertical = 8.dp
-                    )
-            )
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .statusBarsPadding()
+                        .padding(
+                            horizontal = 12.dp,
+                            vertical = 8.dp
+                        )
+                )
+            }
         }
     }
 }

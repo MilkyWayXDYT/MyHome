@@ -27,6 +27,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.robotpaw.myhome.R
 import com.robotpaw.myhome.game.MissionKind
+import com.robotpaw.myhome.game.PetKind
 import com.robotpaw.myhome.ui.theme.HomeColors
 import com.robotpaw.myhome.ui.theme.HomeType
 
@@ -37,8 +38,11 @@ import com.robotpaw.myhome.ui.theme.HomeType
 data class MissionSprite(@DrawableRes val start: Int, @DrawableRes val done: Int? = null)
 
 object MissionSprites {
-    // null - картинки пока нет, рисуется заглушка
-    fun of(kind: MissionKind): MissionSprite? = when (kind) {
+    /**
+     * null - картинки пока нет, рисуется заглушка
+     * @param pet - у заданий питомца картинки свои для кота, собаки и свиньи
+     */
+    fun of(kind: MissionKind, pet: PetKind? = null): MissionSprite? = when (kind) {
         MissionKind.DOOR -> MissionSprite(R.drawable.q_door_start, R.drawable.q_door_done)
         MissionKind.PICTURE -> MissionSprite(R.drawable.q_picture_start, R.drawable.q_picture_done)
         MissionKind.PILLOWS -> MissionSprite(R.drawable.q_pillows_start, R.drawable.q_pillows_done)
@@ -54,7 +58,22 @@ object MissionSprites {
         MissionKind.TEA -> MissionSprite(R.drawable.q_tea_start, R.drawable.q_tea_done)
         MissionKind.SALAD -> MissionSprite(R.drawable.q_salad_start, R.drawable.q_salad_done)
         MissionKind.PANCAKES -> MissionSprite(R.drawable.q_pancakes_start, R.drawable.q_pancakes_done)
-        else -> null
+        MissionKind.CUBES -> MissionSprite(R.drawable.q_cubes_start, R.drawable.q_cubes_done)
+        MissionKind.PET_CHOICE -> MissionSprite(
+            R.drawable.q_pet_choice_start,
+            when (pet) {
+                PetKind.DOG -> R.drawable.q_pet_choice_done_dog
+                PetKind.PIG -> R.drawable.q_pet_choice_done_pig
+                else -> R.drawable.q_pet_choice_done_cat
+            }
+        )
+        MissionKind.PET_TOY -> when (pet) {
+            PetKind.DOG -> MissionSprite(R.drawable.q_pet_toy_start_dog, R.drawable.q_pet_toy_done_dog)
+            PetKind.PIG -> MissionSprite(R.drawable.q_pet_toy_start_pig, R.drawable.q_pet_toy_done_pig)
+            else -> MissionSprite(R.drawable.q_pet_toy_start_cat, R.drawable.q_pet_toy_done_cat)
+        }
+        MissionKind.PET_BOWL -> MissionSprite(R.drawable.q_pet_bowl_start, R.drawable.q_pet_bowl_done)
+        MissionKind.PET_FOOD -> MissionSprite(R.drawable.q_pet_food_start, R.drawable.q_pet_food_done)
     }
 }
 
@@ -65,7 +84,19 @@ object MissionSprites {
 @Composable
 fun MissionObject(kind: MissionKind, progress: Float, modifier: Modifier = Modifier) {
     val p = progress.coerceIn(0f, 1f)
-    val sprite = MissionSprites.of(kind)
+    val sprite = MissionSprites.of(kind, LocalPet.current)
+    if (sprite != null) {
+        val res = if (p >= 1f) sprite.done ?: sprite.start else sprite.start
+        ArtFrame(modifier) {
+            Image(
+                painter = painterResource(res),
+                contentDescription = kind.label,
+                contentScale = ContentScale.FillBounds,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+        return
+    }
     Box(
         modifier
             .fillMaxWidth()
@@ -73,17 +104,7 @@ fun MissionObject(kind: MissionKind, progress: Float, modifier: Modifier = Modif
             .background(HomeColors.Card),
         contentAlignment = Alignment.Center
     ) {
-        if (sprite != null) {
-            val res = if (p >= 1f) sprite.done ?: sprite.start else sprite.start
-            Image(
-                painter = painterResource(res),
-                contentDescription = kind.label,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
-            )
-        } else {
-            Placeholder(kind, p)
-        }
+        Placeholder(kind, p)
     }
 }
 
