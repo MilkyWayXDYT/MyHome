@@ -34,6 +34,8 @@ import com.robotpaw.myhome.game.Mission
 import com.robotpaw.myhome.game.MissionCheckpoint
 import com.robotpaw.myhome.game.MissionResult
 import com.robotpaw.myhome.game.PetKind
+import com.robotpaw.myhome.game.RecordOutcome
+import com.robotpaw.myhome.game.toStats
 import com.robotpaw.myhome.game.save.ProgressRepository
 import com.robotpaw.myhome.game.save.SharedPreferencesStorage
 import com.robotpaw.myhome.game.Rooms
@@ -151,7 +153,7 @@ private sealed interface Screen {
     data class Play(val mission: Mission, val checkpoint: MissionCheckpoint = MissionCheckpoint()) : Screen
     data class Pause(val mission: Mission, val checkpoint: MissionCheckpoint) : Screen
     // roomCompleted - этим заданием пройдена вся комната
-    data class Result(val result: MissionResult, val roomCompleted: Boolean) : Screen
+    data class Result(val result: MissionResult, val roomCompleted: Boolean, val record: RecordOutcome) : Screen
 }
 
 private fun roomScreenOf(mission: Mission): Screen.Room {
@@ -294,8 +296,9 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
                 onDone = { result ->
                     val room = Rooms.of(current.mission)
                     val wasDone = progress.isDone(room)
-                    progress = progress.withCompleted(current.mission)
-                    screen = Screen.Result(result, roomCompleted = !wasDone && progress.isDone(room))
+                    val record = RecordOutcome.of(result, progress.recordOf(current.mission))
+                    progress = progress.withResult(result)
+                    screen = Screen.Result(result, roomCompleted = !wasDone && progress.isDone(room), record = record)
                 },
                 onPause = { checkpoint -> screen = Screen.Pause(current.mission, checkpoint) },
                 pet = progress.pet ?: PetKind.CAT,
@@ -317,6 +320,8 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
                 source = emulator,
                 profile = profile,
                 result = current.result,
+                stats = current.result.log.toStats(),
+                record = current.record,
                 onChoice = { choice ->
                     screen = when (choice) {
                         ResultChoice.ROOM -> {
@@ -342,6 +347,7 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
                     profile = profile,
                     roomTitle = room.title,
                     nextRoomTitle = next?.title,
+                    summary = progress.summaryOf(room),
                     onNext = { screen = if (next != null) Screen.Room(next.id) else Screen.MainMenu }
                 )
             }

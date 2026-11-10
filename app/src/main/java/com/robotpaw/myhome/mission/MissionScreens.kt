@@ -2,6 +2,7 @@ package com.robotpaw.myhome.mission
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -17,6 +18,11 @@ import androidx.compose.ui.unit.dp
 import com.robotpaw.myhome.game.Mission
 import com.robotpaw.myhome.game.MissionCheckpoint
 import com.robotpaw.myhome.game.PetKind
+import com.robotpaw.myhome.game.MissionStats
+import com.robotpaw.myhome.game.RecordOutcome
+import com.robotpaw.myhome.game.RecordStatus
+import com.robotpaw.myhome.game.RoomSummary
+import com.robotpaw.myhome.game.formatTime
 import com.robotpaw.myhome.game.MissionResult
 import com.robotpaw.myhome.menu.MenuItem
 import com.robotpaw.myhome.menu.MenuList
@@ -197,6 +203,8 @@ fun ResultScreen(
     source: SignalSource,
     profile: SignalProfile,
     result: MissionResult,
+    stats: MissionStats,
+    record: RecordOutcome,
     onChoice: (ResultChoice) -> Unit
 ) {
     val control = rememberMenuControl(
@@ -211,15 +219,57 @@ fun ResultScreen(
         overline = "Результат задания"
     ) {
         HomeCard {
-            Text("Здесь будет статистика задания", fontSize = HomeType.Body, fontWeight = FontWeight.Bold, color = HomeColors.Ink)
-            Text("Чистота сигнала, удержание, встречные сигналы", fontSize = HomeType.Label, color = HomeColors.InkSecondary)
+            if (stats.hasData) {
+                StatRow("Время", stats.timeText)
+                StatRow("Чистота сигнала", "${stats.cleanPercent}%")
+                StatRow("Ошибки", stats.mistakes.toString())
+                if (stats.averageStrength > 0) StatRow("Средняя сила", "${stats.averageStrength}%")
+                if (stats.bestStreak > 0) StatRow("Лучшая серия", stats.bestStreak.toString())
+                if (stats.pauses > 0) StatRow("Окна поддержки", stats.pauses.toString())
+            } else {
+                Text("Задание выполнено", fontSize = HomeType.Body, fontWeight = FontWeight.Bold, color = HomeColors.Ink)
+            }
+            RecordLine(record)
         }
         MenuList(control)
     }
 }
 
+// строка статистики: подпись слева, значение справа
+@Composable
+private fun StatRow(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, fontSize = HomeType.Label, color = HomeColors.InkSecondary)
+        Text(value, fontSize = HomeType.Body, fontWeight = FontWeight.Bold, color = HomeColors.Ink)
+    }
+}
+
+// что показать про рекорд под статистикой
+@Composable
+private fun RecordLine(record: RecordOutcome) {
+    val best = record.best
+    when (record.status) {
+        RecordStatus.NONE -> Unit
+        RecordStatus.FIRST ->
+            Text("Первое прохождение, результат сохранён", fontSize = HomeType.Label, color = HomeColors.InkSecondary)
+        RecordStatus.NEW ->
+            Text("Новый рекорд!", fontSize = HomeType.Body, fontWeight = FontWeight.ExtraBold, color = HomeColors.Accent)
+        RecordStatus.NOT_BEATEN -> if (best != null) {
+            Text(
+                "Ваш рекорд: ${formatTime(best.durationMs)}, ошибок: ${best.mistakes}",
+                fontSize = HomeType.Label, color = HomeColors.InkSecondary
+            )
+        }
+    }
+}
+
 /**
- * Экран «Отдохни» после комнаты (заглушка)
+ * Экран «Отдохни» после комнаты: итоги комнаты и совет расслабить руку
+ * @param summary - итоги по лучшим результатам заданий комнаты
  */
 @Composable
 fun RestScreen(
@@ -227,6 +277,7 @@ fun RestScreen(
     profile: SignalProfile,
     roomTitle: String,
     nextRoomTitle: String?,
+    summary: RoomSummary? = null,
     onNext: () -> Unit
 ) {
     val control = rememberMenuControl(
@@ -241,8 +292,16 @@ fun RestScreen(
         overline = "$roomTitle пройдена",
         subtitle = "Расслабьте руку, прежде чем идти дальше."
     ) {
-        HomeCard {
-            Text("Здесь будет экран отдыха", fontSize = HomeType.Body, fontWeight = FontWeight.Bold, color = HomeColors.Ink)
+        if (summary != null) {
+            HomeCard {
+                Text("Итоги комнаты", fontSize = HomeType.Body, fontWeight = FontWeight.Bold, color = HomeColors.Ink)
+                StatRow("Задания", "${summary.done} из ${summary.total}")
+                if (summary.hasData) {
+                    StatRow("Время", formatTime(summary.totalMs))
+                    StatRow("Ошибки", summary.mistakes.toString())
+                    StatRow("Чистота сигнала", "${summary.cleanPercent}%")
+                }
+            }
         }
         Spacer(Modifier.weight(1f))
         MenuList(control)

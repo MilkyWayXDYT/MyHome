@@ -1,14 +1,43 @@
 package com.robotpaw.myhome.game
 
 /**
- * Пройденные задания и выбранный питомец (только в памяти)
+ * Пройденные задания, выбранный питомец и лучшие результаты
  */
 data class GameProgress(
     val completedMissions: Set<String> = emptySet(),
-    val pet: PetKind? = null
+    val pet: PetKind? = null,
+    val records: Map<String, MissionRecord> = emptyMap()
 ) {
 
     fun withPet(pet: PetKind) = copy(pet = pet)
+
+    fun recordOf(mission: Mission): MissionRecord? = records[mission.id]
+
+    /**
+     * Засчитывает задание как пройденное и обновляет рекорд, если результат лучше прежнего
+     */
+    fun withResult(result: MissionResult): GameProgress {
+        val done = withCompleted(result.mission)
+        val stats = result.log.toStats()
+        if (!stats.hasData) return done
+        val now = MissionRecord.of(stats)
+        val old = records[result.mission.id]
+        return if (old == null || now.isBetterThan(old)) done.copy(records = records + (result.mission.id to now)) else done
+    }
+
+    /**
+     * Итоги комнаты по лучшим результатам её заданий
+     */
+    fun summaryOf(room: Room): RoomSummary {
+        val roomRecords = room.missions.mapNotNull { records[it.id] }
+        return RoomSummary(
+            done = completedCount(room),
+            total = room.requiredMissions.size,
+            totalMs = roomRecords.sumOf { it.durationMs },
+            mistakes = roomRecords.sumOf { it.mistakes },
+            cleanPercent = if (roomRecords.isEmpty()) 100 else roomRecords.sumOf { it.cleanPercent } / roomRecords.size
+        )
+    }
 
     fun withCompleted(mission: Mission) = copy(completedMissions = completedMissions + mission.id)
 
