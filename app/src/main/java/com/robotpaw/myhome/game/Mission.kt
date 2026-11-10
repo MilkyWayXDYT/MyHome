@@ -46,6 +46,7 @@ enum class Difficulty(val label: String) {
  * @param optional - дополнительная сложность, для прохождения комнаты не обязательно
  * @param instruction - шаги для экрана инструкции
  * @param doneTitle - заголовок экрана результата
+ * @param repeatable - false: после выполнения задание больше не запускается (выбор питомца)
  */
 data class Mission(
     val id: String,
@@ -55,7 +56,8 @@ data class Mission(
     val doneTitle: String,
     val difficulty: Difficulty = Difficulty.NONE,
     val optional: Boolean = false,
-    val instruction: List<String> = listOf("Здесь будет инструкция к заданию")
+    val instruction: List<String> = listOf("Здесь будет инструкция к заданию"),
+    val repeatable: Boolean = true
 )
 
 /**
@@ -215,7 +217,8 @@ object Missions {
                 "Короткий сигнал переключает питомца, удержание выбирает его",
                 "Можно выбрать: " + PetKind.entries.joinToString(", ") { it.title.lowercase() },
                 "Выбранный питомец останется с вами до конца игры"
-            )
+            ),
+            repeatable = false
         ),
         Mission(
             "pet_toy", MissionKind.PET_TOY, "Подарите игрушку", "Корзинка с игрушками", "Питомец играет!",

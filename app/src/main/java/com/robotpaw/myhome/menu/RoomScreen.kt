@@ -50,11 +50,14 @@ fun RoomScreen(
     val control = rememberMenuControl(
         source = source,
         profile = profile,
-        items = missions.map { MenuItem(it.wallTitle, subtitleOf(it), done = progress.isCompleted(it)) },
+        items = missions.map {
+            val locked = isLocked(it, progress)
+            MenuItem(it.wallTitle, if (locked) "Уже выполнено, повторить нельзя" else subtitleOf(it), done = progress.isCompleted(it))
+        },
         backTitle = "Выйти в меню",
         initialIndex = initialWall,
         onBack = onBack,
-        onSelect = { onStart(missions[it]) }
+        onSelect = { if (!isLocked(missions[it], progress)) onStart(missions[it]) }
     )
     val index = control.selected
     val mission = missions.getOrNull(index)   // null - пункт «Выйти в меню»
@@ -87,7 +90,9 @@ fun RoomScreen(
 
         WallDots(count = control.items.size, selected = index)
 
-        WallCard(item, control.selectProgress, control.ringColor)
+        // у закрытого задания кольцо не заполняется: выбрать его нельзя
+        val locked = mission != null && isLocked(mission, progress)
+        WallCard(item, if (locked) 0f else control.selectProgress, control.ringColor)
     }
 }
 
@@ -133,6 +138,9 @@ internal fun WallDots(count: Int, selected: Int) {
         }
     }
 }
+
+// выполненное задание, которое нельзя повторить (выбор питомца)
+private fun isLocked(mission: Mission, progress: GameProgress) = !mission.repeatable && progress.isCompleted(mission)
 
 internal fun subtitleOf(mission: Mission): String = listOfNotNull(
     mission.title,

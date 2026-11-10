@@ -213,7 +213,7 @@ fun ResultScreen(
     val control = rememberMenuControl(
         source = source,
         profile = profile,
-        items = listOf(MenuItem("В комнату"), MenuItem("Ещё раз")),
+        items = if (result.mission.repeatable) listOf(MenuItem("В комнату"), MenuItem("Ещё раз")) else listOf(MenuItem("В комнату")),
         onSelect = { onChoice(ResultChoice.entries[it]) }
     )
 
