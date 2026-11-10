@@ -13,6 +13,7 @@ import com.robotpaw.myhome.game.GameProgress
 import com.robotpaw.myhome.game.Room
 import com.robotpaw.myhome.game.Rooms
 import com.robotpaw.myhome.game.Stars
+import com.robotpaw.myhome.game.session.Session
 import com.robotpaw.myhome.signal.SignalProfile
 import com.robotpaw.myhome.signal.SignalSource
 import com.robotpaw.myhome.signal.UserLevel
@@ -46,6 +47,7 @@ enum class MainMenuChoice { CONTINUE, ROOMS, GOALS, SIGNAL_CHECK, RECALIBRATE, G
 
 /**
  * Главное меню
+ * @param session - тренировка за день, для строки «сегодня 1 из 3»
  * @param showDeveloperItems - пункт «Витрина компонентов» (только debug)
  */
 @Composable
@@ -53,6 +55,7 @@ fun MainMenuScreen(
     source: SignalSource,
     profile: SignalProfile,
     progress: GameProgress,
+    session: Session? = null,
     showDeveloperItems: Boolean = false,
     onChoice: (MainMenuChoice) -> Unit
 ) {
@@ -67,7 +70,15 @@ fun MainMenuScreen(
         items = listOf(
             MenuItem("Продолжить тренировку", "${room.title} · ${progress.completedCount(room)} из ${room.requiredMissions.size} · ★ ${roomStars.stars} из ${roomStars.maxStars}"),
             MenuItem("Все комнаты", "открыто $unlocked из ${Rooms.ALL.size}"),
-            MenuItem("Цели на сегодня", "что даёт звёзды"),
+            MenuItem(
+                "Цели на сегодня",
+                when {
+                    session == null -> "что даёт звёзды"
+                    session.isPlanDone -> "план выполнен · ${session.done} из ${session.plan}"
+                    else -> "сегодня ${session.done} из ${session.plan}"
+                },
+                done = session?.isPlanDone == true
+            ),
             MenuItem("Проверка сигнала", "код состояния и команды меню"),
             MenuItem("Калибровка заново", "сейчас режим: $levelText")
         ) + if (showDeveloperItems) listOf(MenuItem("Витрина компонентов", "только в debug-сборке")) else emptyList(),

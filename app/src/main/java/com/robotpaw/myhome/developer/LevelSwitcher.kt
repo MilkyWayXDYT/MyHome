@@ -42,6 +42,8 @@ import com.robotpaw.myhome.game.Mission
 import com.robotpaw.myhome.game.PetKind
 import com.robotpaw.myhome.game.Room
 import com.robotpaw.myhome.game.Rooms
+import com.robotpaw.myhome.game.session.Fatigue
+import com.robotpaw.myhome.game.session.Session
 import com.robotpaw.myhome.ui.theme.HomeColors
 
 /**
@@ -76,7 +78,9 @@ enum class DebugJump(val title: String) {
     CALIBRATION("Калибровка"),
     REST("Отдых"),
     GOALS("Цели"),
-    SIGNAL_CHECK("Сигнал")
+    SIGNAL_CHECK("Сигнал"),
+    BREAK("Передышка"),
+    SESSION_END("Итог дня")
 }
 
 private enum class DebugTab(val title: String) { ROOMS("Комнаты"), CHEATS("Читы"), SCREENS("Экраны") }
@@ -86,6 +90,8 @@ private enum class DebugTab(val title: String) { ROOMS("Комнаты"), CHEATS
  * Показывать только в debug-сборке
  * @param progress - текущий прогресс (для отметок «пройдено» и звёзд)
  * @param onProgressChange - новый прогресс после чита
+ * @param session - тренировка за день (план и усталость)
+ * @param onSessionChange - новая сессия после чита
  * @param onJumpToMission - открыть задание сразу, минуя меню и инструкцию
  * @param onWinMission - засчитать задание без игры: смена предмета и экран результата, как после настоящего прохождения
  * @param onJumpToRoom - открыть комнату; предыдущие комнаты при этом считаются пройденными
@@ -96,6 +102,8 @@ private enum class DebugTab(val title: String) { ROOMS("Комнаты"), CHEATS
 fun LevelSwitcher(
     progress: GameProgress,
     onProgressChange: (GameProgress) -> Unit,
+    session: Session,
+    onSessionChange: (Session) -> Unit,
     onJumpToMission: (Mission) -> Unit,
     onWinMission: (Mission) -> Unit,
     onJumpToRoom: (Room) -> Unit,
@@ -172,6 +180,8 @@ fun LevelSwitcher(
                 DebugTab.CHEATS -> CheatsTab(
                     progress = progress,
                     onProgressChange = onProgressChange,
+                    session = session,
+                    onSessionChange = onSessionChange,
                     onResetCalibration = { expanded = false; onResetCalibration() }
                 )
                 DebugTab.SCREENS -> DebugJump.entries.chunked(3).forEach { row ->
@@ -235,6 +245,8 @@ private fun RoomsTab(
 private fun CheatsTab(
     progress: GameProgress,
     onProgressChange: (GameProgress) -> Unit,
+    session: Session,
+    onSessionChange: (Session) -> Unit,
     onResetCalibration: () -> Unit
 ) {
     Section("Прогресс")
@@ -257,6 +269,17 @@ private fun CheatsTab(
     ButtonRow(
         PetKind.entries.map { pet -> pet.title to { onProgressChange(progress.withPet(pet)) } } +
                 listOf("Нет" to { onProgressChange(progress.withoutPet()) })
+    )
+
+    Section("Сегодня ${session.done} из ${session.plan} · усталость: ${session.fatigue.title}")
+    ButtonRow((1..Session.MAX_PLAN).map { n -> "План $n" to { onSessionChange(session.withPlan(n)) } })
+    // усталость: нет / лёгкая / сильная, держится до ближайшего отдыха
+    ButtonRow(Fatigue.entries.map { f -> f.title to { onSessionChange(session.copy(forcedFatigue = f)) } })
+    ButtonRow(
+        listOf(
+            "Новый день" to { onSessionChange(Session(session.day)) },
+            "+1 задание" to { onSessionChange(session.copy(done = session.done + 1)) }
+        )
     )
 
     Section("Калибровка")

@@ -38,7 +38,11 @@ import com.robotpaw.myhome.game.PetKind
 import com.robotpaw.myhome.game.RecordOutcome
 import com.robotpaw.myhome.game.StarsOutcome
 import com.robotpaw.myhome.game.toStats
+import com.robotpaw.myhome.game.RoomKind
 import com.robotpaw.myhome.game.save.ProfileRepository
+import com.robotpaw.myhome.game.save.SessionRepository
+import com.robotpaw.myhome.game.session.Fatigue
+import com.robotpaw.myhome.game.session.SessionAdvice
 import com.robotpaw.myhome.game.save.ProgressRepository
 import com.robotpaw.myhome.game.save.SharedPreferencesStorage
 import com.robotpaw.myhome.game.Rooms
@@ -48,6 +52,7 @@ import com.robotpaw.myhome.menu.GoalsScreen
 import com.robotpaw.myhome.menu.MainMenuChoice
 import com.robotpaw.myhome.menu.MainMenuScreen
 import com.robotpaw.myhome.menu.RoomsScreen
+import com.robotpaw.myhome.mission.BreakScreen
 import com.robotpaw.myhome.mission.InstructionScreen
 import com.robotpaw.myhome.mission.LocalPet
 import com.robotpaw.myhome.mission.MissionScreen
@@ -58,6 +63,7 @@ import com.robotpaw.myhome.mission.ResultChoice
 import com.robotpaw.myhome.mission.ResultScreen
 import com.robotpaw.myhome.mission.RoomScenes
 import com.robotpaw.myhome.mission.SceneChangeScreen
+import com.robotpaw.myhome.mission.SessionEndScreen
 import com.robotpaw.myhome.signal.Channel
 import com.robotpaw.myhome.signal.SignalProcessor
 import com.robotpaw.myhome.signal.SignalProfile
@@ -164,6 +170,10 @@ private sealed interface Screen {
     data class Result(val result: MissionResult, val roomCompleted: Boolean, val record: RecordOutcome, val stars: StarsOutcome) : Screen
     // предмет в комнате меняется на «после», затем экран результата next
     data class Change(val next: Result) : Screen
+    // передышка между заданиями, потом экран next
+    data class Break(val next: Screen) : Screen
+    // план на день выполнен или рука устала; next - куда идти, если игрок возьмёт ещё задание
+    data class SessionEnd(val next: Screen) : Screen
 }
 
 private fun roomScreenOf(mission: Mission): Screen.Room {
@@ -181,6 +191,11 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
     val profileRepository = remember { ProfileRepository(storage) }
     var progress by remember { mutableStateOf(repository.load()) }
     LaunchedEffect(progress) { repository.save(progress) }
+
+    // Тренировка за день: план 1-3 задания (лимит мягкий) и усталость
+    val sessionRepository = remember { SessionRepository(storage) }
+    var session by remember { mutableStateOf(sessionRepository.load(java.time.LocalDate.now().toString())) }
+    LaunchedEffect(session) { sessionRepository.save(session) }
 
     // Первый запуск - калибровка. Дальше калибровку можно пропустить: короткая разминка с сохранённым профилем
     val savedProfile = remember { profileRepository.load() }
@@ -230,8 +245,16 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
         val record = RecordOutcome.of(result, progress.recordOf(result.mission))
         val stars = progress.starsFor(result)
         progress = progress.withResult(result)
+        session = session.withResult(result.log.toStats(), stars.gained, countsForPlan = room.kind != RoomKind.TUTORIAL)
         val resultScreen = Screen.Result(result, roomCompleted = !wasDone && progress.isDone(room), record = record, stars = stars)
         screen = if (RoomScenes.of(result.mission.kind) != null) Screen.Change(resultScreen) else resultScreen
+    }
+
+    // После задания: при усталости сначала передышка, а если план выполнен или рука сильно устала - предложить закончить
+    fun afterMission(target: Screen): Screen = when (session.advice()) {
+        SessionAdvice.ENOUGH -> Screen.SessionEnd(target)
+        SessionAdvice.REST -> if (target is Screen.Rest) target else Screen.Break(target)   // после комнаты и так отдых
+        SessionAdvice.CONTINUE -> target
     }
 
     // выбранный питомец нужен картинкам комнат и заданий
@@ -262,6 +285,7 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
                     source = emulator,
                     profile = profile,
                     progress = progress,
+                    session = session,
                     showDeveloperItems = isDebug,
                     onChoice = { choice ->
                         screen = when (choice) {
@@ -361,7 +385,7 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
                     record = current.record,
                     stars = current.stars,
                     onChoice = { choice ->
-                        screen = when (choice) {
+                        screen = afterMission(when (choice) {
                             ResultChoice.ROOM -> {
                                 val room = Rooms.of(current.result.mission)
                                 val next = Rooms.next(room)
@@ -373,7 +397,7 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
                                 }
                             }
                             ResultChoice.AGAIN -> Screen.Play(current.result.mission)
-                        }
+                        })
                     }
                 )
 
@@ -386,9 +410,34 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
                         roomTitle = room.title,
                         nextRoomTitle = next?.title,
                         summary = progress.summaryOf(room),
-                        onNext = { screen = if (next != null) Screen.Room(next.id) else Screen.MainMenu }
+                        onNext = {
+                            session = session.withRest()
+                            screen = if (next != null) Screen.Room(next.id) else Screen.MainMenu
+                        }
                     )
                 }
+
+                is Screen.Break -> BreakScreen(
+                    source = emulator,
+                    profile = profile,
+                    session = session,
+                    onDone = {
+                        session = session.withRest()
+                        screen = current.next
+                    }
+                )
+
+                is Screen.SessionEnd -> SessionEndScreen(
+                    source = emulator,
+                    profile = profile,
+                    session = session,
+                    onFinish = { screen = Screen.MainMenu },
+                    onMore = {
+                        val tired = session.fatigue != Fatigue.NONE
+                        session = session.withExtra()
+                        screen = if (tired) Screen.Break(current.next) else current.next
+                    }
+                )
             }
 
             // Эмулятор доступен только в debug-сборке.
@@ -408,6 +457,8 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
                 LevelSwitcher(
                     progress = progress,
                     onProgressChange = { progress = it },
+                    session = session,
+                    onSessionChange = { session = it },
                     onJumpToMission = { screen = Screen.Play(it) },
                     // без статистики задание даёт одну звезду, как заглушка
                     onWinMission = { finishMission(MissionResult(it)) },
@@ -423,6 +474,8 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
                             DebugJump.REST -> Screen.Rest(progress.currentRoom().id)
                             DebugJump.GOALS -> Screen.Goals
                             DebugJump.SIGNAL_CHECK -> Screen.SignalCheck
+                            DebugJump.BREAK -> Screen.Break(Screen.MainMenu)
+                            DebugJump.SESSION_END -> Screen.SessionEnd(Screen.MainMenu)
                         }
                     },
                     onResetCalibration = {
