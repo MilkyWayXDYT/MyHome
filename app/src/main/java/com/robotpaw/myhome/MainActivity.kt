@@ -328,7 +328,7 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
                 val room = Rooms.of(mission)
                 SceneChangeScreen(
                     mission = mission,
-                    roomTitle = room.title,
+                    room = room,
                     isDone = { kind -> room.missions.any { it.kind == kind && progress.isCompleted(it) } },
                     onFinished = { screen = current.next }
                 )

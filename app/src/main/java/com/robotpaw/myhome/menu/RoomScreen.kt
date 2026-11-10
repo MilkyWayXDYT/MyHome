@@ -12,6 +12,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -85,25 +87,38 @@ fun RoomScreen(
 
         WallDots(count = control.items.size, selected = index)
 
-        HomeCard(highlighted = true) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(item.title, fontSize = HomeType.Heading, fontWeight = FontWeight.ExtraBold, color = HomeColors.Ink)
-                    if (item.subtitle != null) {
-                        Text(item.subtitle, fontSize = HomeType.Label, color = HomeColors.InkSecondary)
-                    }
-                    if (item.done) {
-                        Text("выполнено", fontSize = HomeType.Label, fontWeight = FontWeight.Bold, color = HomeColors.Accent)
-                    }
+        WallCard(item, control.selectProgress, control.ringColor)
+    }
+}
+
+/**
+ * Карточка стены под сценой (её же показывает экран смены предмета, чтобы сцена была того же размера)
+ */
+@Composable
+internal fun WallCard(item: MenuItem, ringProgress: Float, ringColor: Color) {
+    HomeCard(highlighted = true) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(item.title, fontSize = HomeType.Heading, fontWeight = FontWeight.ExtraBold, color = HomeColors.Ink)
+                if (item.subtitle != null) {
+                    Text(item.subtitle, fontSize = HomeType.Label, color = HomeColors.InkSecondary)
                 }
-                HoldRing(control.selectProgress, control.ringColor)
+                // строка есть всегда, у невыполненного она прозрачная: высота карточки и размер сцены не прыгают
+                Text(
+                    "выполнено",
+                    fontSize = HomeType.Label,
+                    fontWeight = FontWeight.Bold,
+                    color = if (item.done) HomeColors.Accent else Color.Transparent,
+                    modifier = if (item.done) Modifier else Modifier.clearAndSetSemantics {}
+                )
             }
+            HoldRing(ringProgress, ringColor)
         }
     }
 }
 
 @Composable
-private fun WallDots(count: Int, selected: Int) {
+internal fun WallDots(count: Int, selected: Int) {
     Row(
         Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)
@@ -119,7 +134,7 @@ private fun WallDots(count: Int, selected: Int) {
     }
 }
 
-private fun subtitleOf(mission: Mission): String = listOfNotNull(
+internal fun subtitleOf(mission: Mission): String = listOfNotNull(
     mission.title,
     mission.difficulty.label.ifEmpty { null },
     if (mission.optional) "доп. сложность" else null

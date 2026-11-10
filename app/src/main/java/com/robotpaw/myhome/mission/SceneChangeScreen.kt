@@ -9,18 +9,24 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import com.robotpaw.myhome.game.Mission
 import com.robotpaw.myhome.game.MissionKind
+import com.robotpaw.myhome.game.Room
+import com.robotpaw.myhome.menu.MenuItem
+import com.robotpaw.myhome.menu.WallCard
+import com.robotpaw.myhome.menu.WallDots
+import com.robotpaw.myhome.menu.subtitleOf
 import com.robotpaw.myhome.ui.components.HomeScreen
+import com.robotpaw.myhome.ui.theme.HomeColors
 import kotlinx.coroutines.delay
 
 /**
  * Короткая сцена после задания: в комнате предмет меняется на «после», потом сам открывается экран результата
- * Нажимать ничего не нужно
+ * Нажимать ничего не нужно. Разметка как у экрана комнаты, чтобы сцена была того же размера
  * @param isDone - выполнены ли остальные задания комнаты (их предметы показываются как есть)
  */
 @Composable
 fun SceneChangeScreen(
     mission: Mission,
-    roomTitle: String,
+    room: Room,
     isDone: (MissionKind) -> Boolean,
     onFinished: () -> Unit
 ) {
@@ -38,7 +44,7 @@ fun SceneChangeScreen(
         onFinished()
     }
 
-    HomeScreen(title = mission.doneTitle, overline = roomTitle) {
+    HomeScreen(title = room.title, overline = mission.doneTitle) {
         if (art != null) {
             RoomSceneView(
                 art = art,
@@ -48,6 +54,8 @@ fun SceneChangeScreen(
                 modifier = Modifier.weight(1f)
             )
         }
+        WallDots(count = room.missions.size, selected = room.missions.indexOf(mission))
+        WallCard(MenuItem(mission.wallTitle, subtitleOf(mission), done = true), ringProgress = 0f, ringColor = HomeColors.Accent)
     }
 }
 
