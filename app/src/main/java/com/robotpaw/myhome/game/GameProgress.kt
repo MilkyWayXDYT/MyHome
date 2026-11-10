@@ -1,28 +1,46 @@
 package com.robotpaw.myhome.game
 
 /**
- * Пройденные задания, выбранный питомец и лучшие результаты
+ * Пройденные задания, выбранный питомец, лучшие результаты и звёзды
  */
 data class GameProgress(
     val completedMissions: Set<String> = emptySet(),
     val pet: PetKind? = null,
-    val records: Map<String, MissionRecord> = emptyMap()
+    val records: Map<String, MissionRecord> = emptyMap(),
+    val stars: Map<String, Int> = emptyMap()
 ) {
 
     fun withPet(pet: PetKind) = copy(pet = pet)
 
     fun recordOf(mission: Mission): MissionRecord? = records[mission.id]
 
+    // лучшее число звёзд за задание (0, если звёзд ещё нет)
+    fun starsOf(mission: Mission): Int = stars[mission.id] ?: 0
+
+    // всего звёзд у игрока: сумма лучших результатов по заданиям
+    val totalStars: Int get() = stars.values.sum()
+
     /**
-     * Засчитывает задание как пройденное и обновляет рекорд, если результат лучше прежнего
+     * Сколько звёзд даст это прохождение. Считать нужно до withResult
+     */
+    fun starsFor(result: MissionResult): StarsOutcome {
+        val earned = Stars.forStats(result.log.toStats())
+        val gained = (earned - starsOf(result.mission)).coerceAtLeast(0)
+        return StarsOutcome(earned = earned, gained = gained, total = totalStars + gained)
+    }
+
+    /**
+     * Засчитывает задание как пройденное, обновляет звёзды и рекорд, если результат лучше прежнего
      */
     fun withResult(result: MissionResult): GameProgress {
-        val done = withCompleted(result.mission)
         val stats = result.log.toStats()
-        if (!stats.hasData) return done
+        val earned = Stars.forStats(stats)
+        var updated = withCompleted(result.mission)
+        if (earned > starsOf(result.mission)) updated = updated.copy(stars = stars + (result.mission.id to earned))
+        if (!stats.hasData) return updated
         val now = MissionRecord.of(stats)
         val old = records[result.mission.id]
-        return if (old == null || now.isBetterThan(old)) done.copy(records = records + (result.mission.id to now)) else done
+        return if (old == null || now.isBetterThan(old)) updated.copy(records = records + (result.mission.id to now)) else updated
     }
 
     /**
@@ -35,7 +53,9 @@ data class GameProgress(
             total = room.requiredMissions.size,
             totalMs = roomRecords.sumOf { it.durationMs },
             mistakes = roomRecords.sumOf { it.mistakes },
-            cleanPercent = if (roomRecords.isEmpty()) 100 else roomRecords.sumOf { it.cleanPercent } / roomRecords.size
+            cleanPercent = if (roomRecords.isEmpty()) 100 else roomRecords.sumOf { it.cleanPercent } / roomRecords.size,
+            stars = room.missions.sumOf { starsOf(it) },
+            maxStars = room.missions.size * Stars.MAX
         )
     }
 

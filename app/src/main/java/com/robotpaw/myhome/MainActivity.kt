@@ -35,6 +35,7 @@ import com.robotpaw.myhome.game.MissionCheckpoint
 import com.robotpaw.myhome.game.MissionResult
 import com.robotpaw.myhome.game.PetKind
 import com.robotpaw.myhome.game.RecordOutcome
+import com.robotpaw.myhome.game.StarsOutcome
 import com.robotpaw.myhome.game.toStats
 import com.robotpaw.myhome.game.save.ProgressRepository
 import com.robotpaw.myhome.game.save.SharedPreferencesStorage
@@ -153,7 +154,7 @@ private sealed interface Screen {
     data class Play(val mission: Mission, val checkpoint: MissionCheckpoint = MissionCheckpoint()) : Screen
     data class Pause(val mission: Mission, val checkpoint: MissionCheckpoint) : Screen
     // roomCompleted - этим заданием пройдена вся комната
-    data class Result(val result: MissionResult, val roomCompleted: Boolean, val record: RecordOutcome) : Screen
+    data class Result(val result: MissionResult, val roomCompleted: Boolean, val record: RecordOutcome, val stars: StarsOutcome) : Screen
 }
 
 private fun roomScreenOf(mission: Mission): Screen.Room {
@@ -297,8 +298,9 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
                     val room = Rooms.of(current.mission)
                     val wasDone = progress.isDone(room)
                     val record = RecordOutcome.of(result, progress.recordOf(current.mission))
+                    val stars = progress.starsFor(result)
                     progress = progress.withResult(result)
-                    screen = Screen.Result(result, roomCompleted = !wasDone && progress.isDone(room), record = record)
+                    screen = Screen.Result(result, roomCompleted = !wasDone && progress.isDone(room), record = record, stars = stars)
                 },
                 onPause = { checkpoint -> screen = Screen.Pause(current.mission, checkpoint) },
                 pet = progress.pet ?: PetKind.CAT,
@@ -322,6 +324,7 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
                 result = current.result,
                 stats = current.result.log.toStats(),
                 record = current.record,
+                stars = current.stars,
                 onChoice = { choice ->
                     screen = when (choice) {
                         ResultChoice.ROOM -> {

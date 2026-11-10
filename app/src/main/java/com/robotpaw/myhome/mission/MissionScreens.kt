@@ -22,6 +22,8 @@ import com.robotpaw.myhome.game.MissionStats
 import com.robotpaw.myhome.game.RecordOutcome
 import com.robotpaw.myhome.game.RecordStatus
 import com.robotpaw.myhome.game.RoomSummary
+import com.robotpaw.myhome.game.Stars
+import com.robotpaw.myhome.game.StarsOutcome
 import com.robotpaw.myhome.game.formatTime
 import com.robotpaw.myhome.game.MissionResult
 import com.robotpaw.myhome.menu.MenuItem
@@ -205,6 +207,7 @@ fun ResultScreen(
     result: MissionResult,
     stats: MissionStats,
     record: RecordOutcome,
+    stars: StarsOutcome,
     onChoice: (ResultChoice) -> Unit
 ) {
     val control = rememberMenuControl(
@@ -219,6 +222,10 @@ fun ResultScreen(
         overline = "Результат задания"
     ) {
         HomeCard {
+            Text(
+                "★".repeat(stars.earned) + "☆".repeat(Stars.MAX - stars.earned),
+                fontSize = HomeType.Heading, color = HomeColors.Accent
+            )
             if (stats.hasData) {
                 StatRow("Время", stats.timeText)
                 StatRow("Чистота сигнала", "${stats.cleanPercent}%")
@@ -230,6 +237,11 @@ fun ResultScreen(
                 Text("Задание выполнено", fontSize = HomeType.Body, fontWeight = FontWeight.Bold, color = HomeColors.Ink)
             }
             RecordLine(record)
+            Text(
+                if (stars.gained > 0) "+${stars.gained} ${Stars.word(stars.gained)}" else "Звёзды за это задание уже получены",
+                fontSize = HomeType.Label, color = HomeColors.InkSecondary
+            )
+            StatRow("Всего звёзд", stars.total.toString())
         }
         MenuList(control)
     }
@@ -296,6 +308,7 @@ fun RestScreen(
             HomeCard {
                 Text("Итоги комнаты", fontSize = HomeType.Body, fontWeight = FontWeight.Bold, color = HomeColors.Ink)
                 StatRow("Задания", "${summary.done} из ${summary.total}")
+                if (summary.maxStars > 0) StatRow("Звёзды", "${summary.stars} из ${summary.maxStars}")
                 if (summary.hasData) {
                     StatRow("Время", formatTime(summary.totalMs))
                     StatRow("Ошибки", summary.mistakes.toString())

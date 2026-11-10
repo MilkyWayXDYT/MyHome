@@ -93,4 +93,17 @@ class ProgressRepositoryTest {
         storage.strings[ProgressRepository.KEY_RECORD_PREFIX + Missions.TUTORIAL[0].id] = "abc;1"
         assertTrue(ProgressRepository(storage).load().records.isEmpty())
     }
+
+    @Test
+    fun stars_roundTrip_andAreRemovedOnReset() {
+        val storage = InMemoryStorage()
+        val repository = ProgressRepository(storage)
+        val saved = GameProgress().withResult(MissionResult(Missions.TUTORIAL[0], MissionLog(durationMs = 9_000L)))
+        repository.save(saved)
+
+        assertEquals(3, repository.load().starsOf(Missions.TUTORIAL[0]))
+
+        repository.save(GameProgress())
+        assertEquals(0, repository.load().totalStars)
+    }
 }

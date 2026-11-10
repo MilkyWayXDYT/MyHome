@@ -4,9 +4,10 @@ import com.robotpaw.myhome.game.GameProgress
 import com.robotpaw.myhome.game.MissionRecord
 import com.robotpaw.myhome.game.PetKind
 import com.robotpaw.myhome.game.Rooms
+import com.robotpaw.myhome.game.Stars
 
 /**
- * Сохраняет и загружает прогресс игры: пройденные задания, выбранного питомца и лучшие результаты
+ * Сохраняет и загружает прогресс игры: пройденные задания, выбранного питомца, лучшие результаты и звёзды
  * Калибровка не сохраняется: по решению команды игрок проходит её заново при каждом запуске
  * Новые данные (звёзды, лучшие результаты) добавляются сюда же отдельными ключами
  */
@@ -21,7 +22,8 @@ class ProgressRepository(private val storage: KeyValueStorage) {
         val completed = storage.getStringSet(KEY_COMPLETED).filter { it in knownMissions }.toSet()
         val pet = storage.getString(KEY_PET)?.let { name -> PetKind.entries.firstOrNull { it.name == name } }
         val records = knownMissions.mapNotNull { id -> parseRecord(storage.getString(recordKey(id)))?.let { id to it } }.toMap()
-        return GameProgress(completedMissions = completed, pet = pet, records = records)
+        val stars = knownMissions.mapNotNull { id -> storage.getString(starsKey(id))?.toIntOrNull()?.let { id to it.coerceIn(0, Stars.MAX) } }.toMap()
+        return GameProgress(completedMissions = completed, pet = pet, records = records, stars = stars)
     }
 
     fun save(progress: GameProgress) {
@@ -30,10 +32,13 @@ class ProgressRepository(private val storage: KeyValueStorage) {
         // идём по всем заданиям, чтобы при сбросе прогресса старые рекорды удалились
         Rooms.ALL.flatMap { it.missions }.forEach { mission ->
             storage.putString(recordKey(mission.id), progress.records[mission.id]?.let { encodeRecord(it) })
+            storage.putString(starsKey(mission.id), progress.stars[mission.id]?.toString())
         }
     }
 
     private fun recordKey(missionId: String) = "$KEY_RECORD_PREFIX$missionId"
+
+    private fun starsKey(missionId: String) = "$KEY_STARS_PREFIX$missionId"
 
     private fun encodeRecord(record: MissionRecord) = "${record.durationMs};${record.mistakes};${record.cleanPercent}"
 
@@ -50,5 +55,6 @@ class ProgressRepository(private val storage: KeyValueStorage) {
         const val KEY_COMPLETED = "completed_missions"
         const val KEY_PET = "pet"
         const val KEY_RECORD_PREFIX = "record_"
+        const val KEY_STARS_PREFIX = "stars_"
     }
 }

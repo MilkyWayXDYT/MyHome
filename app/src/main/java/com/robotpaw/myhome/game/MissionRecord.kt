@@ -52,13 +52,17 @@ data class RecordOutcome(val status: RecordStatus, val best: MissionRecord? = nu
  * @param totalMs - суммарное время лучших результатов
  * @param mistakes - суммарные ошибки в лучших результатах
  * @param cleanPercent - средняя чистота сигнала (0..100)
+ * @param stars - звёзды, заработанные в комнате
+ * @param maxStars - сколько звёзд можно получить в комнате
  */
 data class RoomSummary(
     val done: Int,
     val total: Int,
     val totalMs: Long,
     val mistakes: Int,
-    val cleanPercent: Int
+    val cleanPercent: Int,
+    val stars: Int = 0,
+    val maxStars: Int = 0
 ) {
     val hasData: Boolean get() = totalMs > 0L
 }
