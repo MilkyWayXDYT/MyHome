@@ -28,6 +28,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.DisposableEffect
 import androidx.lifecycle.lifecycleScope
 import com.robotpaw.myhome.calibration.CalibrationScreen
+import com.robotpaw.myhome.calibration.WelcomeBackScreen
 import com.robotpaw.myhome.emulator.EmulatorSignalSource
 import com.robotpaw.myhome.game.GameProgress
 import com.robotpaw.myhome.game.Mission
@@ -37,6 +38,7 @@ import com.robotpaw.myhome.game.PetKind
 import com.robotpaw.myhome.game.RecordOutcome
 import com.robotpaw.myhome.game.StarsOutcome
 import com.robotpaw.myhome.game.toStats
+import com.robotpaw.myhome.game.save.ProfileRepository
 import com.robotpaw.myhome.game.save.ProgressRepository
 import com.robotpaw.myhome.game.save.SharedPreferencesStorage
 import com.robotpaw.myhome.game.Rooms
@@ -146,6 +148,8 @@ class MainActivity : ComponentActivity() {
 
 private sealed interface Screen {
     data object Calibration : Screen
+    // повторный запуск: разминка вместо калибровки
+    data object WelcomeBack : Screen
     data object MainMenu : Screen
     data object Goals : Screen
     data object SignalCheck : Screen
@@ -170,17 +174,18 @@ private fun roomScreenOf(mission: Mission): Screen.Room {
 @Composable
 fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
 
-    // Калибровка не сохраняется: при каждом запуске игрок проходит её заново.
-    var screen by remember { mutableStateOf<Screen>(Screen.Calibration) }
-
-    // Прогресс (пройденные задания, питомец) хранится между запусками
+    // Прогресс (пройденные задания, питомец) и профиль сигнала хранятся между запусками
     val context = LocalContext.current
-    val repository = remember {
-        ProgressRepository(SharedPreferencesStorage(context.getSharedPreferences("myhome_save", Context.MODE_PRIVATE)))
-    }
+    val storage = remember { SharedPreferencesStorage(context.getSharedPreferences("myhome_save", Context.MODE_PRIVATE)) }
+    val repository = remember { ProgressRepository(storage) }
+    val profileRepository = remember { ProfileRepository(storage) }
     var progress by remember { mutableStateOf(repository.load()) }
     LaunchedEffect(progress) { repository.save(progress) }
-    var profile by remember { mutableStateOf(SignalProfile()) }
+
+    // Первый запуск - калибровка. Дальше калибровку можно пропустить: короткая разминка с сохранённым профилем
+    val savedProfile = remember { profileRepository.load() }
+    var profile by remember { mutableStateOf(savedProfile ?: SignalProfile()) }
+    var screen by remember { mutableStateOf<Screen>(if (savedProfile != null) Screen.WelcomeBack else Screen.Calibration) }
 
     var overlayExpanded by rememberSaveable {
         mutableStateOf(false)
@@ -230,8 +235,16 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
                     source = emulator,
                     onFinished = {
                         profile = it
+                        profileRepository.save(it)
                         screen = Screen.MainMenu
                     }
+                )
+
+                Screen.WelcomeBack -> WelcomeBackScreen(
+                    source = emulator,
+                    profile = profile,
+                    onReady = { screen = Screen.MainMenu },
+                    onRecalibrate = { screen = Screen.Calibration }
                 )
 
                 Screen.MainMenu -> MainMenuScreen(
