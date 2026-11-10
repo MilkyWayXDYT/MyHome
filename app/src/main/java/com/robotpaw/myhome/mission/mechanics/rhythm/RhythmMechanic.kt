@@ -77,7 +77,8 @@ fun RhythmMechanic(
     val input = rememberMechanicInput(source, profile) { state, dt ->
         if (attempt.finished) return@rememberMechanicInput
 
-        recorder.onFrame(state, dt, rules.currentChannel)
+        // в ритме паузы между ударами нормальны, ошибки считаются промахами
+        recorder.onFrame(state, dt, rules.currentChannel, trackStability = false)
         val event = rules.update(state, dt)
         if (event.hit) lastResult = "Попал!"
         if (event.miss) {

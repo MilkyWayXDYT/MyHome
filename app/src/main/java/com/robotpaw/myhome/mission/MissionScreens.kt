@@ -230,7 +230,12 @@ fun ResultScreen(
                 StatRow("Время", stats.timeText)
                 StatRow("Чистота сигнала", "${stats.cleanPercent}%")
                 StatRow("Ошибки", stats.mistakes.toString())
-                if (stats.averageStrength > 0) StatRow("Средняя сила", "${stats.averageStrength}%")
+                if (stats.interruptions > 0) StatRow("Срывы сигнала", stats.interruptions.toString())
+                if (stats.wrongChannel > 0) StatRow("Не та мышца", stats.wrongChannel.toString())
+                if (stats.averageStrength > 0) {
+                    StatRow("Средняя сила", "${stats.averageStrength}%")
+                    StatRow("Ровность нажатия", "${stats.steadyPercent}%")
+                }
                 if (stats.bestStreak > 0) StatRow("Лучшая серия", stats.bestStreak.toString())
                 if (stats.pauses > 0) StatRow("Окна поддержки", stats.pauses.toString())
             } else {

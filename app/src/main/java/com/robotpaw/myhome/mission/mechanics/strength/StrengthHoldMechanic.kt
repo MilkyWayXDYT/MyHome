@@ -54,7 +54,8 @@ fun StrengthHoldMechanic(
     val input = rememberMechanicInput(source, profile) { state, dt ->
         if (attempt.finished) return@rememberMechanicInput
 
-        recorder.onFrame(state, dt, Channel.FLEXOR)
+        // если «уронил» уже считается ошибкой, срывы отдельно не считаем
+        recorder.onFrame(state, dt, Channel.FLEXOR, trackStability = !config.dropIsError)
         val event = rules.update(state, dt)
         if (event.drop) recorder.addError()
         progress = rules.progress

@@ -94,4 +94,29 @@ class MissionStatsTest {
         assertEquals(2, summary.mistakes)
         assertEquals(95, summary.cleanPercent)            // среднее из 100 и 90
     }
+
+    @Test
+    fun stats_includeInterruptionsAndWrongChannel_inMistakesAndCleanPercent() {
+        val stats = MissionLog(
+            durationMs = 10_000L, interruptions = 2, wrongChannelEvents = 1, offTargetMs = 3000L
+        ).toStats()
+        assertEquals(3, stats.mistakes)
+        assertEquals(2, stats.interruptions)
+        assertEquals(1, stats.wrongChannel)
+        assertEquals(70, stats.cleanPercent)
+    }
+
+    @Test
+    fun unstableSignal_doesNotGiveThreeStars() {
+        val stats = MissionLog(durationMs = 10_000L, interruptions = 3, offTargetMs = 4000L).toStats()
+        assertEquals(1, Stars.forStats(stats))
+    }
+
+    @Test
+    fun steadiness_reflectsJitter() {
+        assertEquals(100, MissionLog().steadinessPercent)
+        val log = MissionLog(durationMs = 1000L, jitterSum = 100L, jitterFrames = 50)    // средний скачок 2 -> 100 - 24
+        assertEquals(76, log.steadinessPercent)
+        assertEquals(76, log.toStats().steadyPercent)
+    }
 }
