@@ -73,6 +73,7 @@ fun RhythmMechanic(
     var streak by remember { mutableIntStateOf(0) }
     var countdownLeft by remember { mutableLongStateOf(config.countdownMs) }
     var lastResult by remember { mutableStateOf("") }
+    var lastHit by remember { mutableStateOf(false) }
 
     val input = rememberMechanicInput(source, profile) { state, dt ->
         if (attempt.finished) return@rememberMechanicInput
@@ -80,10 +81,14 @@ fun RhythmMechanic(
         // в ритме паузы между ударами нормальны, ошибки считаются промахами
         recorder.onFrame(state, dt, rules.currentChannel, trackStability = false)
         val event = rules.update(state, dt)
-        if (event.hit) lastResult = "Попал!"
+        if (event.hit) {
+            lastResult = "Попал!"
+            lastHit = true
+        }
         if (event.miss) {
             recorder.addError()
             lastResult = "Мимо"
+            lastHit = false
         }
         recorder.recordStreak(rules.bestStreak)
 
@@ -134,13 +139,15 @@ fun RhythmMechanic(
             if (current == Channel.EXTENSOR) HomeColors.Extensor else HomeColors.Flexor,
             height = 16.dp
         )
+        // попадание - зелёным, промах и встречный сигнал - красным
         WarningLine(
             when {
                 !input.armed -> null
                 state.isCoContraction -> "Напряжены оба канала. Оставьте только нужный"
                 lastResult.isNotEmpty() -> lastResult
                 else -> null
-            }
+            },
+            positive = input.armed && !state.isCoContraction && lastHit
         )
         SignalBars(state)
     }

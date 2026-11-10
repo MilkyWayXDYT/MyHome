@@ -298,19 +298,22 @@ fun StatTile(label: String, value: String, modifier: Modifier = Modifier) {
 
 /**
  * Строка предупреждения. При text = null место остаётся, чтобы экран не прыгал
+ * @param positive - удачное действие: зелёная вместо красной
  */
 @Composable
-fun WarningLine(text: String?) {
+fun WarningLine(text: String?, positive: Boolean = false) {
+    val soft = if (positive) HomeColors.SuccessSoft else HomeColors.WarningSoft
+    val ink = if (positive) HomeColors.Success else HomeColors.Warning
     Box(
         Modifier
             .fillMaxWidth()
             .height(56.dp)
             .clip(RoundedCornerShape(14.dp))
-            .background(if (text != null) HomeColors.WarningSoft else Color.Transparent)
+            .background(if (text != null) soft else Color.Transparent)
             .padding(horizontal = 12.dp),
         contentAlignment = Alignment.CenterStart
     ) {
-        if (text != null) Text(text, fontSize = HomeType.Label, lineHeight = HomeType.LabelLine, fontWeight = FontWeight.Bold, color = HomeColors.Warning)
+        if (text != null) Text(text, fontSize = HomeType.Label, lineHeight = HomeType.LabelLine, fontWeight = FontWeight.Bold, color = ink)
     }
 }
 

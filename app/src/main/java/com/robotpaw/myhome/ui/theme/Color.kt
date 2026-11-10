@@ -31,4 +31,8 @@ object HomeColors {
     // встречный сигнал (С+Р) и предупреждения
     val Warning = Color(0xFFB3261E)
     val WarningSoft = Color(0xFFFBE4E2)
+
+    // удачное действие (попадание в ритм)
+    val Success = Color(0xFF2E7D32)
+    val SuccessSoft = Color(0xFFE2F1DE)
 }
