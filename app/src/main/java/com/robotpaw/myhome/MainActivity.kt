@@ -53,6 +53,8 @@ import com.robotpaw.myhome.mission.PauseScreen
 import com.robotpaw.myhome.mission.RestScreen
 import com.robotpaw.myhome.mission.ResultChoice
 import com.robotpaw.myhome.mission.ResultScreen
+import com.robotpaw.myhome.mission.RoomScenes
+import com.robotpaw.myhome.mission.SceneChangeScreen
 import com.robotpaw.myhome.signal.Channel
 import com.robotpaw.myhome.signal.SignalProcessor
 import com.robotpaw.myhome.signal.SignalProfile
@@ -155,6 +157,8 @@ private sealed interface Screen {
     data class Pause(val mission: Mission, val checkpoint: MissionCheckpoint) : Screen
     // roomCompleted - этим заданием пройдена вся комната
     data class Result(val result: MissionResult, val roomCompleted: Boolean, val record: RecordOutcome, val stars: StarsOutcome) : Screen
+    // предмет в комнате меняется на «после», затем экран результата next
+    data class Change(val next: Result) : Screen
 }
 
 private fun roomScreenOf(mission: Mission): Screen.Room {
@@ -300,7 +304,8 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
                     val record = RecordOutcome.of(result, progress.recordOf(current.mission))
                     val stars = progress.starsFor(result)
                     progress = progress.withResult(result)
-                    screen = Screen.Result(result, roomCompleted = !wasDone && progress.isDone(room), record = record, stars = stars)
+                    val resultScreen = Screen.Result(result, roomCompleted = !wasDone && progress.isDone(room), record = record, stars = stars)
+                    screen = if (RoomScenes.of(current.mission.kind) != null) Screen.Change(resultScreen) else resultScreen
                 },
                 onPause = { checkpoint -> screen = Screen.Pause(current.mission, checkpoint) },
                 pet = progress.pet ?: PetKind.CAT,
@@ -317,6 +322,17 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
                     }
                 }
             )
+
+            is Screen.Change -> key(current.next.result.mission.id) {
+                val mission = current.next.result.mission
+                val room = Rooms.of(mission)
+                SceneChangeScreen(
+                    mission = mission,
+                    roomTitle = room.title,
+                    isDone = { kind -> room.missions.any { it.kind == kind && progress.isCompleted(it) } },
+                    onFinished = { screen = current.next }
+                )
+            }
 
             is Screen.Result -> ResultScreen(
                 source = emulator,

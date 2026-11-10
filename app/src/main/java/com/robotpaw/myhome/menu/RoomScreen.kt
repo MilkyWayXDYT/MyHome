@@ -20,6 +20,8 @@ import com.robotpaw.myhome.game.Mission
 import com.robotpaw.myhome.game.Room
 import com.robotpaw.myhome.mission.EmptyWall
 import com.robotpaw.myhome.mission.MissionObject
+import com.robotpaw.myhome.mission.RoomSceneView
+import com.robotpaw.myhome.mission.RoomScenes
 import com.robotpaw.myhome.signal.SignalProfile
 import com.robotpaw.myhome.signal.SignalSource
 import com.robotpaw.myhome.ui.components.HoldRing
@@ -61,7 +63,15 @@ fun RoomScreen(
         overline = "${index + 1} из ${control.items.size}",
         backProgress = control.backProgress
     ) {
-        if (mission != null) {
+        val scene = mission?.let { RoomScenes.of(it.kind) }
+        if (mission != null && scene != null) {
+            RoomSceneView(
+                art = scene,
+                selected = mission.kind,
+                isDone = { kind -> missions.any { it.kind == kind && progress.isCompleted(it) } },
+                modifier = Modifier.weight(1f)
+            )
+        } else if (mission != null) {
             MissionObject(
                 kind = mission.kind,
                 progress = if (item.done) 1f else 0f,
