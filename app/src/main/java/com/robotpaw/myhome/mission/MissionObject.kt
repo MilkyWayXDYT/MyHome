@@ -25,6 +25,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.robotpaw.myhome.R
 import com.robotpaw.myhome.game.MissionKind
 import com.robotpaw.myhome.ui.theme.HomeColors
 import com.robotpaw.myhome.ui.theme.HomeType
@@ -37,8 +38,22 @@ data class MissionSprite(@DrawableRes val start: Int, @DrawableRes val done: Int
 
 object MissionSprites {
     // null - картинки пока нет, рисуется заглушка
-    // пример: MissionKind.PICTURE -> MissionSprite(R.drawable.picture_floor, R.drawable.picture_wall)
     fun of(kind: MissionKind): MissionSprite? = when (kind) {
+        MissionKind.DOOR -> MissionSprite(R.drawable.q_door_start, R.drawable.q_door_done)
+        MissionKind.PICTURE -> MissionSprite(R.drawable.q_picture_start, R.drawable.q_picture_done)
+        MissionKind.PILLOWS -> MissionSprite(R.drawable.q_pillows_start, R.drawable.q_pillows_done)
+        MissionKind.VACUUM -> MissionSprite(R.drawable.q_vacuum_start, R.drawable.q_vacuum_done)
+        MissionKind.FLOWER -> MissionSprite(R.drawable.q_flower_start, R.drawable.q_flower_done)
+        MissionKind.TOOTHBRUSH -> MissionSprite(R.drawable.q_toothbrush_start, R.drawable.q_toothbrush_done)
+        MissionKind.TOWEL -> MissionSprite(R.drawable.q_towel_start, R.drawable.q_towel_done)
+        MissionKind.MIRROR -> MissionSprite(R.drawable.q_mirror_start, R.drawable.q_mirror_done)
+        MissionKind.LAUNDRY -> MissionSprite(R.drawable.q_laundry_start, R.drawable.q_laundry_done)
+        MissionKind.CLOTHESPINS -> MissionSprite(R.drawable.q_clothespins_start, R.drawable.q_clothespins_done)
+        MissionKind.TRASH -> MissionSprite(R.drawable.q_trash_start, R.drawable.q_trash_done)
+        MissionKind.TABLE -> MissionSprite(R.drawable.q_table_start, R.drawable.q_table_done)
+        MissionKind.TEA -> MissionSprite(R.drawable.q_tea_start, R.drawable.q_tea_done)
+        MissionKind.SALAD -> MissionSprite(R.drawable.q_salad_start, R.drawable.q_salad_done)
+        MissionKind.PANCAKES -> MissionSprite(R.drawable.q_pancakes_start, R.drawable.q_pancakes_done)
         else -> null
     }
 }
@@ -63,8 +78,8 @@ fun MissionObject(kind: MissionKind, progress: Float, modifier: Modifier = Modif
             Image(
                 painter = painterResource(res),
                 contentDescription = kind.label,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxSize().padding(16.dp)
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
             )
         } else {
             Placeholder(kind, p)
