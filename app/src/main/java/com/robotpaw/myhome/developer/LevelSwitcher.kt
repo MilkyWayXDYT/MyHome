@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -38,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.robotpaw.myhome.game.GameProgress
 import com.robotpaw.myhome.game.Mission
+import com.robotpaw.myhome.game.PetKind
 import com.robotpaw.myhome.game.Room
 import com.robotpaw.myhome.game.Rooms
 import com.robotpaw.myhome.ui.theme.HomeColors
@@ -66,24 +68,43 @@ fun GameProgress.withAllCompleted(): GameProgress {
 }
 
 /**
- * Панель разработчика для быстрого перехода между комнатами и заданиями, чтобы не проходить игру с начала
+ * Куда можно сразу перейти из отладочного меню
+ */
+enum class DebugJump(val title: String) {
+    MAIN_MENU("Меню"),
+    WELCOME_BACK("Разминка"),
+    CALIBRATION("Калибровка"),
+    REST("Отдых"),
+    GOALS("Цели"),
+    SIGNAL_CHECK("Сигнал")
+}
+
+private enum class DebugTab(val title: String) { ROOMS("Комнаты"), CHEATS("Читы"), SCREENS("Экраны") }
+
+/**
+ * Отладочное меню: быстрый переход между комнатами и заданиями и читы, чтобы не проходить игру с начала
  * Показывать только в debug-сборке
- * @param progress - текущий прогресс (для отметок «пройдено»)
+ * @param progress - текущий прогресс (для отметок «пройдено» и звёзд)
+ * @param onProgressChange - новый прогресс после чита
  * @param onJumpToMission - открыть задание сразу, минуя меню и инструкцию
+ * @param onWinMission - засчитать задание без игры: смена предмета и экран результата, как после настоящего прохождения
  * @param onJumpToRoom - открыть комнату; предыдущие комнаты при этом считаются пройденными
- * @param onUnlockAll - считать все комнаты пройденными
- * @param onReset - сбросить прогресс
+ * @param onJump - открыть экран
+ * @param onResetCalibration - забыть сохранённую калибровку и пройти её заново
  */
 @Composable
 fun LevelSwitcher(
     progress: GameProgress,
+    onProgressChange: (GameProgress) -> Unit,
     onJumpToMission: (Mission) -> Unit,
+    onWinMission: (Mission) -> Unit,
     onJumpToRoom: (Room) -> Unit,
-    onUnlockAll: () -> Unit,
-    onReset: () -> Unit,
+    onJump: (DebugJump) -> Unit,
+    onResetCalibration: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
+    var tab by rememberSaveable { mutableStateOf(DebugTab.ROOMS) }
 
     if (!expanded) {
         // та же круглая кнопка, что и ⚙ у панелей эмулятора
@@ -96,81 +117,187 @@ fun LevelSwitcher(
                 .clickable { expanded = true },
             contentAlignment = Alignment.Center
         ) {
-            Text("⏭", fontSize = 18.sp, color = HomeColors.Ink)
+            Text("🛠", fontSize = 18.sp, color = HomeColors.Ink)
         }
-    } else {
-        Surface(
-            modifier = modifier
-                .fillMaxWidth()
-                .widthIn(max = 420.dp)
-                .shadow(8.dp, RoundedCornerShape(16.dp)),
-            shape = RoundedCornerShape(16.dp),
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 6.dp
+        return
+    }
+
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .widthIn(max = 420.dp)
+            .shadow(8.dp, RoundedCornerShape(16.dp)),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 6.dp
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(16.dp)
+                .heightIn(max = 520.dp)
+                .verticalScroll(rememberScrollState())
         ) {
-            Column(
-                modifier = Modifier
-                    .padding(16.dp)
-                    .heightIn(max = 520.dp)
-                    .verticalScroll(rememberScrollState())
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Уровни (debug)", fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                    TextButton(onClick = { expanded = false }) { Text("Свернуть") }
-                }
+                Text("Отладка · ★ ${progress.totalStars}", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                TextButton(onClick = { expanded = false }) { Text("Свернуть") }
+            }
 
-                HorizontalDivider()
-                Spacer(Modifier.height(8.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    OutlinedButton(onClick = onUnlockAll, modifier = Modifier.weight(1f)) {
-                        Text("Открыть все")
-                    }
-                    OutlinedButton(onClick = onReset, modifier = Modifier.weight(1f)) {
-                        Text("Сбросить")
-                    }
-                }
-
-                Rooms.ALL.forEach { room ->
-                    Spacer(Modifier.height(12.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+            Row(Modifier.fillMaxWidth()) {
+                DebugTab.entries.forEach { t ->
+                    TextButton(onClick = { tab = t }, modifier = Modifier.weight(1f)) {
                         Text(
-                            "${room.title} · ${progress.completedCount(room)}/${room.requiredMissions.size}",
-                            fontWeight = FontWeight.Bold
+                            t.title,
+                            fontWeight = if (t == tab) FontWeight.ExtraBold else FontWeight.Normal,
+                            color = if (t == tab) HomeColors.Ink else HomeColors.InkSecondary
                         )
-                        TextButton(onClick = {
-                            expanded = false
-                            onJumpToRoom(room)
-                        }) { Text("В комнату") }
-                    }
-
-                    room.missions.forEach { mission ->
-                        TextButton(
-                            onClick = {
-                                expanded = false
-                                onJumpToMission(mission)
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            val mark = if (progress.isCompleted(mission)) "✓ " else ""
-                            val extra = if (mission.optional) " (доп.)" else ""
-                            Text("$mark${mission.title}$extra", modifier = Modifier.weight(1f))
-                            Text(mission.difficulty.label, fontSize = 12.sp)
-                        }
                     }
                 }
             }
+
+            HorizontalDivider()
+            Spacer(Modifier.height(8.dp))
+
+            when (tab) {
+                DebugTab.ROOMS -> RoomsTab(
+                    progress = progress,
+                    onProgressChange = onProgressChange,
+                    onJumpToMission = { expanded = false; onJumpToMission(it) },
+                    onWinMission = { expanded = false; onWinMission(it) },
+                    onJumpToRoom = { expanded = false; onJumpToRoom(it) }
+                )
+                DebugTab.CHEATS -> CheatsTab(
+                    progress = progress,
+                    onProgressChange = onProgressChange,
+                    onResetCalibration = { expanded = false; onResetCalibration() }
+                )
+                DebugTab.SCREENS -> DebugJump.entries.chunked(3).forEach { row ->
+                    ButtonRow(row.map { jump -> jump.title to { expanded = false; onJump(jump) } })
+                }
+            }
         }
+    }
+}
+
+/**
+ * Комнаты и задания: ▶ играть, ✓ выполнить без игры (с анимацией и результатом),
+ * ★ звёзды по кругу 0..3, ○/● отметка «выполнено» без анимации
+ */
+@Composable
+private fun RoomsTab(
+    progress: GameProgress,
+    onProgressChange: (GameProgress) -> Unit,
+    onJumpToMission: (Mission) -> Unit,
+    onWinMission: (Mission) -> Unit,
+    onJumpToRoom: (Room) -> Unit
+) {
+    Text("▶ играть · ✓ пройти сразу · ★ звёзды · ● отметка", fontSize = 12.sp, color = HomeColors.InkSecondary)
+    Rooms.ALL.forEach { room ->
+        Spacer(Modifier.height(12.dp))
+        val summary = progress.summaryOf(room)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                "${room.title} · ${progress.completedCount(room)}/${room.requiredMissions.size} · ★${summary.stars}/${summary.maxStars}",
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f)
+            )
+            TextButton(onClick = { onProgressChange(progress.withRoomReset(room)) }) { Text("Сброс") }
+            TextButton(onClick = { onJumpToRoom(room) }) { Text("В комнату") }
+        }
+
+        room.missions.forEach { mission ->
+            val done = progress.isCompleted(mission)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                val extra = if (mission.optional) " (доп.)" else ""
+                Text(
+                    "${mission.title}$extra",
+                    fontSize = 14.sp,
+                    color = if (done) HomeColors.Accent else HomeColors.Ink,
+                    modifier = Modifier.weight(1f)
+                )
+                SmallButton("▶") { onJumpToMission(mission) }
+                SmallButton("✓") { onWinMission(mission) }
+                SmallButton("★${progress.starsOf(mission)}") { onProgressChange(progress.withNextStarsOf(mission)) }
+                SmallButton(if (done) "●" else "○") { onProgressChange(progress.withMissionDone(mission, !done)) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CheatsTab(
+    progress: GameProgress,
+    onProgressChange: (GameProgress) -> Unit,
+    onResetCalibration: () -> Unit
+) {
+    Section("Прогресс")
+    ButtonRow(
+        listOf(
+            "Открыть все" to { onProgressChange(progress.withAllCompleted()) },
+            "Сбросить всё" to { onProgressChange(GameProgress()) }
+        )
+    )
+
+    Section("Звёзды · сейчас ${progress.totalStars}")
+    ButtonRow(
+        listOf(
+            "Все на ★★★" to { onProgressChange(progress.withAllStars()) },
+            "Убрать звёзды" to { onProgressChange(progress.withoutStars()) }
+        )
+    )
+
+    Section("Питомец · ${progress.pet?.title ?: "не выбран"}")
+    ButtonRow(
+        PetKind.entries.map { pet -> pet.title to { onProgressChange(progress.withPet(pet)) } } +
+                listOf("Нет" to { onProgressChange(progress.withoutPet()) })
+    )
+
+    Section("Калибровка")
+    ButtonRow(listOf("Забыть калибровку" to onResetCalibration))
+}
+
+@Composable
+private fun Section(title: String) {
+    Spacer(Modifier.height(12.dp))
+    Text(title, fontWeight = FontWeight.Bold)
+    Spacer(Modifier.height(4.dp))
+}
+
+@Composable
+private fun ButtonRow(buttons: List<Pair<String, () -> Unit>>) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        buttons.forEach { (title, onClick) ->
+            OutlinedButton(
+                onClick = onClick,
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)
+            ) {
+                Text(title, fontSize = 13.sp, maxLines = 1)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SmallButton(text: String, onClick: () -> Unit) {
+    // обычная кнопка шире 58dp, четыре в строку не помещаются
+    Box(
+        Modifier
+            .size(width = 42.dp, height = 36.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(text, fontSize = 14.sp, color = HomeColors.Ink)
     }
 }

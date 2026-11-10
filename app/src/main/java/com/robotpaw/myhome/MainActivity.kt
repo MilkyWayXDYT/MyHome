@@ -16,8 +16,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.robotpaw.myhome.developer.ComponentGallery
 import com.robotpaw.myhome.developer.EmulatorPads
+import com.robotpaw.myhome.developer.DebugJump
 import com.robotpaw.myhome.developer.LevelSwitcher
-import com.robotpaw.myhome.developer.withAllCompleted
 import com.robotpaw.myhome.developer.withCompletedBefore
 import com.robotpaw.myhome.developer.SignalOverlay
 import android.view.InputDevice
@@ -223,6 +223,17 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
         }
     }
 
+    // Задание пройдено: засчитать результат, показать смену предмета (если есть сцена) и экран результата
+    fun finishMission(result: MissionResult) {
+        val room = Rooms.of(result.mission)
+        val wasDone = progress.isDone(room)
+        val record = RecordOutcome.of(result, progress.recordOf(result.mission))
+        val stars = progress.starsFor(result)
+        progress = progress.withResult(result)
+        val resultScreen = Screen.Result(result, roomCompleted = !wasDone && progress.isDone(room), record = record, stars = stars)
+        screen = if (RoomScenes.of(result.mission.kind) != null) Screen.Change(resultScreen) else resultScreen
+    }
+
     // выбранный питомец нужен картинкам комнат и заданий
     CompositionLocalProvider(LocalPet provides progress.pet) {
         Box(
@@ -314,15 +325,7 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
                     roomTitle = Rooms.of(current.mission).title,
                     mission = current.mission,
                     checkpoint = current.checkpoint,
-                    onDone = { result ->
-                        val room = Rooms.of(current.mission)
-                        val wasDone = progress.isDone(room)
-                        val record = RecordOutcome.of(result, progress.recordOf(current.mission))
-                        val stars = progress.starsFor(result)
-                        progress = progress.withResult(result)
-                        val resultScreen = Screen.Result(result, roomCompleted = !wasDone && progress.isDone(room), record = record, stars = stars)
-                        screen = if (RoomScenes.of(current.mission.kind) != null) Screen.Change(resultScreen) else resultScreen
-                    },
+                    onDone = { finishMission(it) },
                     onPause = { checkpoint -> screen = Screen.Pause(current.mission, checkpoint) },
                     pet = progress.pet ?: PetKind.CAT,
                     onPetChosen = { progress = progress.withPet(it) }
@@ -404,13 +407,29 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
             if (isDebug) {
                 LevelSwitcher(
                     progress = progress,
+                    onProgressChange = { progress = it },
                     onJumpToMission = { screen = Screen.Play(it) },
+                    // без статистики задание даёт одну звезду, как заглушка
+                    onWinMission = { finishMission(MissionResult(it)) },
                     onJumpToRoom = { room ->
                         progress = progress.withCompletedBefore(room)
                         screen = Screen.Room(room.id)
                     },
-                    onUnlockAll = { progress = progress.withAllCompleted() },
-                    onReset = { progress = GameProgress() },
+                    onJump = { jump ->
+                        screen = when (jump) {
+                            DebugJump.MAIN_MENU -> Screen.MainMenu
+                            DebugJump.WELCOME_BACK -> Screen.WelcomeBack
+                            DebugJump.CALIBRATION -> Screen.Calibration
+                            DebugJump.REST -> Screen.Rest(progress.currentRoom().id)
+                            DebugJump.GOALS -> Screen.Goals
+                            DebugJump.SIGNAL_CHECK -> Screen.SignalCheck
+                        }
+                    },
+                    onResetCalibration = {
+                        profileRepository.clear()
+                        profile = SignalProfile()
+                        screen = Screen.Calibration
+                    },
                     modifier = Modifier
                         .align(Alignment.BottomStart)
                         .navigationBarsPadding()

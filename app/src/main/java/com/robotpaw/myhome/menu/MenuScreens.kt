@@ -12,12 +12,14 @@ import androidx.compose.ui.unit.dp
 import com.robotpaw.myhome.game.GameProgress
 import com.robotpaw.myhome.game.Room
 import com.robotpaw.myhome.game.Rooms
+import com.robotpaw.myhome.game.Stars
 import com.robotpaw.myhome.signal.SignalProfile
 import com.robotpaw.myhome.signal.SignalSource
 import com.robotpaw.myhome.signal.UserLevel
 import com.robotpaw.myhome.ui.components.HomeCard
 import com.robotpaw.myhome.ui.components.HomeScreen
 import com.robotpaw.myhome.ui.components.MenuItemCard
+import com.robotpaw.myhome.ui.components.StarsBadge
 import com.robotpaw.myhome.ui.theme.HomeColors
 import com.robotpaw.myhome.ui.theme.HomeType
 
@@ -37,6 +39,9 @@ fun MenuList(control: MenuControl, modifier: Modifier = Modifier) {
     }
 }
 
+// сколько звёзд можно собрать за всю игру: по Stars.MAX за каждое задание
+internal fun maxStars(): Int = Rooms.ALL.sumOf { it.missions.size } * Stars.MAX
+
 enum class MainMenuChoice { CONTINUE, ROOMS, GOALS, SIGNAL_CHECK, RECALIBRATE, GALLERY }
 
 /**
@@ -54,12 +59,13 @@ fun MainMenuScreen(
     val room = progress.currentRoom()
     val unlocked = Rooms.ALL.count { progress.isUnlocked(it) }
     val levelText = if (profile.level == UserLevel.NOVICE) "новичок" else "опытный"
+    val roomStars = progress.summaryOf(room)
 
     val control = rememberMenuControl(
         source = source,
         profile = profile,
         items = listOf(
-            MenuItem("Продолжить тренировку", "${room.title} · ${progress.completedCount(room)} из ${room.requiredMissions.size}"),
+            MenuItem("Продолжить тренировку", "${room.title} · ${progress.completedCount(room)} из ${room.requiredMissions.size} · ★ ${roomStars.stars} из ${roomStars.maxStars}"),
             MenuItem("Все комнаты", "открыто $unlocked из ${Rooms.ALL.size}"),
             MenuItem("Цели на сегодня", "что даёт звёзды"),
             MenuItem("Проверка сигнала", "код состояния и команды меню"),
@@ -70,7 +76,8 @@ fun MainMenuScreen(
 
     HomeScreen(
         title = "Мой дом",
-        overline = "Добрый день!"
+        overline = "Добрый день!",
+        trailing = { StarsBadge(progress.totalStars, maxStars()) }
     ) {
         MenuList(control)
     }
@@ -92,10 +99,12 @@ fun RoomsScreen(
         source = source,
         profile = profile,
         items = rooms.mapIndexed { i, room ->
+            val summary = progress.summaryOf(room)
+            val stars = "★ ${summary.stars} из ${summary.maxStars}"
             val subtitle = when {
                 !progress.isUnlocked(room) -> "закрыто, сначала: ${rooms[i - 1].title}"
-                progress.isDone(room) -> "пройдено"
-                else -> "${progress.completedCount(room)} из ${room.requiredMissions.size}"
+                progress.isDone(room) -> "пройдено · $stars"
+                else -> "${progress.completedCount(room)} из ${room.requiredMissions.size} · $stars"
             }
             MenuItem(room.title, subtitle, done = progress.isDone(room))
         },
@@ -106,7 +115,8 @@ fun RoomsScreen(
 
     HomeScreen(
         title = "Комнаты",
-        backProgress = control.backProgress
+        backProgress = control.backProgress,
+        trailing = { StarsBadge(progress.totalStars, maxStars()) }
     ) {
         MenuList(control)
     }

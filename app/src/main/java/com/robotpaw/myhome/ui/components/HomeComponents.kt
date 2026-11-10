@@ -50,6 +50,7 @@ fun channelLetter(channel: Channel): String =
  * Каркас экрана
  * @param backProgress - заполнение «назад» удержанием Р, пока держат - справа в шапке кольцо
  * @param bottom - закреплено внизу
+ * @param trailing - справа в шапке, например счётчик звёзд
  */
 @Composable
 fun HomeScreen(
@@ -59,6 +60,7 @@ fun HomeScreen(
     subtitle: String? = null,
     backProgress: Float = 0f,
     bottom: @Composable ColumnScope.() -> Unit = {},
+    trailing: (@Composable () -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
     Column(
@@ -79,6 +81,7 @@ fun HomeScreen(
                     Text(subtitle, fontSize = HomeType.Body, lineHeight = HomeType.BodyLine, color = HomeColors.InkSecondary)
                 }
             }
+            if (trailing != null && backProgress <= 0f) trailing()
             if (backProgress > 0f) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Назад", fontSize = HomeType.Label, fontWeight = FontWeight.Bold, color = HomeColors.Ink)
@@ -317,8 +320,12 @@ fun WarningLine(text: String?, positive: Boolean = false) {
     }
 }
 
+/**
+ * Счётчик звёзд
+ * @param max - сколько всего можно получить, тогда показывается «12 / 45»
+ */
 @Composable
-fun StarsBadge(stars: Int) {
+fun StarsBadge(stars: Int, max: Int? = null) {
     Row(
         Modifier
             .clip(RoundedCornerShape(14.dp))
@@ -329,8 +336,16 @@ fun StarsBadge(stars: Int) {
     ) {
         Text("★", fontSize = HomeType.Body, color = HomeColors.Extensor)
         Text("$stars", fontSize = HomeType.Body, fontWeight = FontWeight.ExtraBold, color = HomeColors.Ink)
+        if (max != null) Text("/ $max", fontSize = HomeType.Label, fontWeight = FontWeight.Bold, color = HomeColors.InkSecondary)
     }
 }
+
+/**
+ * Звёзды за задание строкой: ★★☆
+ * @param earned - сколько получено
+ * @param max - сколько всего
+ */
+fun starsText(earned: Int, max: Int = 3): String = "★".repeat(earned.coerceIn(0, max)) + "☆".repeat((max - earned).coerceIn(0, max))
 
 // затемнение под окнами
 val OverlayScrim = Color.Black.copy(alpha = 0.7f)

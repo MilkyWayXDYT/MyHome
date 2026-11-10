@@ -29,6 +29,8 @@ import com.robotpaw.myhome.signal.SignalSource
 import com.robotpaw.myhome.ui.components.HoldRing
 import com.robotpaw.myhome.ui.components.HomeCard
 import com.robotpaw.myhome.ui.components.HomeScreen
+import com.robotpaw.myhome.ui.components.StarsBadge
+import com.robotpaw.myhome.ui.components.starsText
 import com.robotpaw.myhome.ui.theme.HomeColors
 import com.robotpaw.myhome.ui.theme.HomeType
 
@@ -62,11 +64,13 @@ fun RoomScreen(
     val index = control.selected
     val mission = missions.getOrNull(index)   // null - пункт «Выйти в меню»
     val item = control.items[index]
+    val summary = progress.summaryOf(room)
 
     HomeScreen(
         title = room.title,
         overline = "${index + 1} из ${control.items.size}",
-        backProgress = control.backProgress
+        backProgress = control.backProgress,
+        trailing = { StarsBadge(summary.stars, summary.maxStars) }
     ) {
         val scene = mission?.let { RoomScenes.of(it.kind) }
         if (mission != null && scene != null) {
@@ -92,15 +96,16 @@ fun RoomScreen(
 
         // у закрытого задания кольцо не заполняется: выбрать его нельзя
         val locked = mission != null && isLocked(mission, progress)
-        WallCard(item, if (locked) 0f else control.selectProgress, control.ringColor)
+        WallCard(item, if (locked) 0f else control.selectProgress, control.ringColor, stars = mission?.let { progress.starsOf(it) })
     }
 }
 
 /**
  * Карточка стены под сценой (её же показывает экран смены предмета, чтобы сцена была того же размера)
+ * @param stars - лучшие звёзды за задание, у выполненного показываются рядом с «выполнено»
  */
 @Composable
-internal fun WallCard(item: MenuItem, ringProgress: Float, ringColor: Color) {
+internal fun WallCard(item: MenuItem, ringProgress: Float, ringColor: Color, stars: Int? = null) {
     HomeCard(highlighted = true) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -110,7 +115,7 @@ internal fun WallCard(item: MenuItem, ringProgress: Float, ringColor: Color) {
                 }
                 // строка есть всегда, у невыполненного она прозрачная: высота карточки и размер сцены не прыгают
                 Text(
-                    "выполнено",
+                    if (stars != null && stars > 0) "выполнено · ${starsText(stars)}" else "выполнено",
                     fontSize = HomeType.Label,
                     fontWeight = FontWeight.Bold,
                     color = if (item.done) HomeColors.Accent else Color.Transparent,
