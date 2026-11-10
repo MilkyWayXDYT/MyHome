@@ -12,7 +12,6 @@ import androidx.compose.ui.unit.dp
 import com.robotpaw.myhome.game.GameProgress
 import com.robotpaw.myhome.game.Room
 import com.robotpaw.myhome.game.Rooms
-import com.robotpaw.myhome.game.Stars
 import com.robotpaw.myhome.game.session.Session
 import com.robotpaw.myhome.signal.SignalProfile
 import com.robotpaw.myhome.signal.SignalSource
@@ -39,9 +38,6 @@ fun MenuList(control: MenuControl, modifier: Modifier = Modifier) {
         }
     }
 }
-
-// сколько звёзд можно собрать за всю игру: по Stars.MAX за каждое задание
-internal fun maxStars(): Int = Rooms.ALL.sumOf { it.missions.size } * Stars.MAX
 
 enum class MainMenuChoice { CONTINUE, ROOMS, GOALS, SIGNAL_CHECK, RECALIBRATE, GALLERY }
 
@@ -88,7 +84,7 @@ fun MainMenuScreen(
     HomeScreen(
         title = "Мой дом",
         overline = "Добрый день!",
-        trailing = { StarsBadge(progress.totalStars, maxStars()) }
+        trailing = { StarsBadge(progress.totalStars) }
     ) {
         MenuList(control)
     }
@@ -127,7 +123,7 @@ fun RoomsScreen(
     HomeScreen(
         title = "Комнаты",
         backProgress = control.backProgress,
-        trailing = { StarsBadge(progress.totalStars, maxStars()) }
+        trailing = { StarsBadge(progress.totalStars) }
     ) {
         MenuList(control)
     }
