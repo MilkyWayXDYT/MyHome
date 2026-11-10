@@ -1,6 +1,7 @@
 package com.robotpaw.myhome
 
 import android.annotation.SuppressLint
+import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -33,6 +34,8 @@ import com.robotpaw.myhome.game.Mission
 import com.robotpaw.myhome.game.MissionCheckpoint
 import com.robotpaw.myhome.game.MissionResult
 import com.robotpaw.myhome.game.PetKind
+import com.robotpaw.myhome.game.save.ProgressRepository
+import com.robotpaw.myhome.game.save.SharedPreferencesStorage
 import com.robotpaw.myhome.game.Rooms
 import com.robotpaw.myhome.menu.RoomScreen
 import com.robotpaw.myhome.developer.SignalCheckScreen
@@ -159,9 +162,16 @@ private fun roomScreenOf(mission: Mission): Screen.Room {
 @Composable
 fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
 
-    // Профиль пока живёт только в памяти, поэтому после поворота экрана начинаем с калибровки.
+    // Калибровка не сохраняется: при каждом запуске игрок проходит её заново.
     var screen by remember { mutableStateOf<Screen>(Screen.Calibration) }
-    var progress by remember { mutableStateOf(GameProgress()) }
+
+    // Прогресс (пройденные задания, питомец) хранится между запусками
+    val context = LocalContext.current
+    val repository = remember {
+        ProgressRepository(SharedPreferencesStorage(context.getSharedPreferences("myhome_save", Context.MODE_PRIVATE)))
+    }
+    var progress by remember { mutableStateOf(repository.load()) }
+    LaunchedEffect(progress) { repository.save(progress) }
     var profile by remember { mutableStateOf(SignalProfile()) }
 
     var overlayExpanded by rememberSaveable {
