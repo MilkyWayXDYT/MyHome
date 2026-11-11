@@ -30,7 +30,7 @@ Android-приложение с игровыми экранами и мини-и
 
    ```bash
    git clone https://git.codenrock.com/codenrock/motorika-kod-dvizheniya/robolapka/igra-trenazher
-   cd MyHome
+   cd igra-trenazher
    ```
 
 2. Откройте папку проекта в Android Studio: **File → Open** и выберите папку `MyHome` (ту, где лежит `settings.gradle.kts`).
