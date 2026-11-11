@@ -1,6 +1,7 @@
 package com.robotpaw.myhome.game.session
 
 import com.robotpaw.myhome.game.MissionStats
+import com.robotpaw.myhome.game.chores.Chores
 import com.robotpaw.myhome.game.goals.DailyGoal
 import com.robotpaw.myhome.game.goals.GoalContext
 import com.robotpaw.myhome.game.goals.GoalKind
@@ -98,10 +99,13 @@ fun fatigueSigns(history: List<MissionStats>, sinceRestMs: Long): Set<FatigueSig
  * @param sinceRestMs - время в заданиях после последнего отдыха (не сохраняется: новый запуск - рука отдохнула)
  * @param history - статистика заданий этого запуска для поиска усталости (не сохраняется)
  * @param forcedFatigue - усталость из отладочного меню, null - считается по заданиям
- * @param goals - цели на сегодня (1-3), по ним задаётся план
+ * @param goals - цели на сегодня: цель под слабый навык и необязательный челлендж
  * @param flawlessStreak - заданий подряд без ошибок в этом запуске (миссия «Без ошибок»)
  * @param quest - квест в жизни на сегодня (null - ещё ни одного не открыто)
  * @param questDone - игрок рассказал, как прошёл квест
+ * @param chores - дела на сегодня после сюжета: id заданий, их предметы снова «до»
+ *   (несделанные хранятся в GameProgress и переходят на следующий день)
+ * @param choresDone - какие дела сделаны сегодня
  */
 data class Session(
     val day: String,
@@ -116,7 +120,9 @@ data class Session(
     val goals: List<DailyGoal> = emptyList(),
     val flawlessStreak: Int = 0,
     val quest: RealQuest? = null,
-    val questDone: Boolean = false
+    val questDone: Boolean = false,
+    val chores: List<String> = emptyList(),
+    val choresDone: Set<String> = emptySet()
 ) {
     val signs: Set<FatigueSign> get() = fatigueSigns(history, sinceRestMs)
 
@@ -157,8 +163,8 @@ data class Session(
 
     fun withPlan(count: Int) = copy(plan = count.coerceIn(1, MAX_PLAN))
 
-    // цели на сегодня, сколько целей - столько заданий в плане
-    fun withGoals(list: List<DailyGoal>) = copy(goals = list).withPlan(list.size.coerceAtLeast(1))
+    // цели на сегодня (цель и челлендж), план на день от них не зависит
+    fun withGoals(list: List<DailyGoal>) = copy(goals = list)
 
     val goalsDone: Int get() = goals.count { it.done }
 
@@ -174,6 +180,22 @@ data class Session(
      */
     fun withGoalsChecked(ctx: GoalContext): Pair<Session, List<DailyGoal>> =
         markGoals { goal -> goal.kind.isMet(ctx.copy(flawlessStreak = flawlessStreak), goal.value) }
+
+    fun withChores(ids: List<String>) = copy(chores = ids, choresDone = emptySet())
+
+    // дела, которые ещё не сделаны: их предметы в комнате показываются «до»
+    val pendingChores: Set<String> get() = chores.toSet() - choresDone
+
+    val isChoresDone: Boolean get() = chores.isNotEmpty() && pendingChores.isEmpty()
+
+    /**
+     * Задание пройдено: если это дело на сегодня, оно сделано и даёт звезду
+     * @return сессия и было ли это дело
+     */
+    fun withChoreDone(missionId: String): Pair<Session, Boolean> {
+        if (missionId !in pendingChores) return this to false
+        return copy(choresDone = choresDone + missionId, starsGained = starsGained + Chores.REWARD) to true
+    }
 
     // квест на сегодня
     fun withQuest(quest: RealQuest?) = copy(quest = quest, questDone = false)

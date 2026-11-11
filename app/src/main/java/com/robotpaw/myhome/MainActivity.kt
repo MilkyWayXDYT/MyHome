@@ -39,6 +39,7 @@ import com.robotpaw.myhome.game.RecordOutcome
 import com.robotpaw.myhome.game.StarsOutcome
 import com.robotpaw.myhome.game.toStats
 import com.robotpaw.myhome.game.RecordStatus
+import com.robotpaw.myhome.game.chores.Chores
 import com.robotpaw.myhome.game.goals.DailyGoal
 import com.robotpaw.myhome.game.goals.GoalContext
 import com.robotpaw.myhome.game.goals.GoalKind
@@ -55,6 +56,7 @@ import com.robotpaw.myhome.game.save.SharedPreferencesStorage
 import com.robotpaw.myhome.game.Rooms
 import com.robotpaw.myhome.menu.RoomScreen
 import com.robotpaw.myhome.developer.SignalCheckScreen
+import com.robotpaw.myhome.menu.ChoresScreen
 import com.robotpaw.myhome.menu.GoalsScreen
 import com.robotpaw.myhome.menu.MainMenuChoice
 import com.robotpaw.myhome.menu.MainMenuScreen
@@ -168,6 +170,8 @@ private sealed interface Screen {
     data object WarmUp : Screen
     data object MainMenu : Screen
     data object Goals : Screen
+    // дела на сегодня после сюжета
+    data object Chores : Screen
     // квест в жизни и рефлексия
     data object RealQuest : Screen
     data object SignalCheck : Screen
@@ -185,7 +189,8 @@ private sealed interface Screen {
         val roomCompleted: Boolean,
         val record: RecordOutcome,
         val stars: StarsOutcome,
-        val goals: List<DailyGoal> = emptyList()
+        val goals: List<DailyGoal> = emptyList(),
+        val chore: Boolean = false
     ) : Screen
     // предмет в комнате меняется на «после», затем экран результата next
     data class Change(val next: Result) : Screen
@@ -225,6 +230,15 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
         val withGoals = if (loaded.goals.isEmpty()) loaded.withGoals(pickGoals()) else loaded
         // квест в жизни: один в день, из заданий, уже пройденных в игре
         mutableStateOf(if (withGoals.quest == null) withGoals.withQuest(RealQuests.pick(progress)) else withGoals)
+    }
+
+    // Дела на сегодня после сюжета: 3 самых слабых задания, несделанные переходят на следующий день
+    // Подбираются, когда игрок открывает «Дела на сегодня», а не сразу после финала:
+    // иначе только что сделанный предмет мог бы снова стать «до»
+    fun startChores() {
+        val ids = Chores.topUp(progress)
+        progress = progress.withChores(ids)
+        session = session.withChores(ids)
     }
     LaunchedEffect(session) { sessionRepository.save(session) }
 
@@ -274,10 +288,12 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
         session = session.withResult(result.log.toStats(), stars.gained)
         val ctx = GoalContext(kind, result.log, newRecord = record.status == RecordStatus.NEW, flawlessStreak = session.flawlessStreak)
         val (checked, goalsDone) = session.withGoalsChecked(ctx)
-        session = checked
+        val (afterChore, chore) = checked.withChoreDone(result.mission.id)
+        session = afterChore
+        if (chore) progress = progress.withChoreDone(result.mission.id)
 
         // попытки навыков для подбора целей: миссии, привязанные к заданиям (рекорд и серия - не навык)
-        var updated = progress.withResult(result).withBonusStars(goalsDone.sumOf { it.reward })
+        var updated = progress.withResult(result).withBonusStars(goalsDone.sumOf { it.reward } + if (chore) Chores.REWARD else 0)
         GoalKind.entries
             .filter { it.appliesTo(kind) && it != GoalKind.RECORD && it != GoalKind.FLAWLESS }
             .forEach { goal ->
@@ -293,7 +309,8 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
             roomCompleted = !wasDone && progress.isDone(room),
             record = record,
             stars = stars.copy(total = progress.totalStars),
-            goals = goalsDone
+            goals = goalsDone,
+            chore = chore
         )
         screen = if (RoomScenes.of(result.mission.kind) != null) Screen.Change(resultScreen) else resultScreen
     }
@@ -354,7 +371,12 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
                     showDeveloperItems = isDebug,
                     onChoice = { choice ->
                         screen = when (choice) {
-                            MainMenuChoice.CONTINUE -> Screen.Room(progress.currentRoom().id)
+                            MainMenuChoice.CONTINUE -> if (progress.isStoryDone) {
+                                if (session.chores.isEmpty()) startChores()
+                                Screen.Chores
+                            } else {
+                                Screen.Room(progress.currentRoom().id)
+                            }
                             MainMenuChoice.ROOMS -> Screen.RoomList
                             MainMenuChoice.GOALS -> Screen.Goals
                             MainMenuChoice.SIGNAL_CHECK -> Screen.SignalCheck
@@ -426,8 +448,18 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
                     progress = progress,
                     initialWall = current.wall,
                     onStart = { screen = Screen.Instruction(it) },
-                    onBack = { screen = Screen.MainMenu }
+                    onBack = { screen = Screen.MainMenu },
+                    pending = session.pendingChores
                 ) }
+
+                Screen.Chores -> ChoresScreen(
+                    source = emulator,
+                    profile = profile,
+                    session = session,
+                    chores = session.chores.mapNotNull { id -> Rooms.ALL.flatMap { it.missions }.firstOrNull { it.id == id } },
+                    onOpen = { screen = roomScreenOf(it) },
+                    onBack = { screen = Screen.MainMenu }
+                )
 
                 is Screen.Instruction -> InstructionScreen(
                     source = emulator,
@@ -466,7 +498,7 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
                     SceneChangeScreen(
                         mission = mission,
                         room = room,
-                        isDone = { kind -> room.missions.any { it.kind == kind && progress.isCompleted(it) } },
+                        isDone = { kind -> room.missions.any { it.kind == kind && progress.isCompleted(it) && it.id !in session.pendingChores } },
                         onFinished = { screen = current.next }
                     )
                 }
@@ -479,6 +511,7 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
                     record = current.record,
                     stars = current.stars,
                     goals = current.goals,
+                    chore = current.chore,
                     onChoice = { choice ->
                         screen = afterMission(when (choice) {
                             ResultChoice.ROOM -> {
@@ -555,7 +588,15 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
                     session = session,
                     onSessionChange = { session = it },
                     onNewGoals = { session = session.withGoals(pickGoals(tired = session.fatigue == Fatigue.TIRED)) },
-                    onNewDay = { session = Session(session.day).withGoals(pickGoals()).withQuest(RealQuests.pick(progress)) },
+                    onNewDay = {
+                        session = Session(session.day).withGoals(pickGoals()).withQuest(RealQuests.pick(progress))
+                        // как новый день: несделанные дела остаются, пул добирается до 3
+                        if (progress.isStoryDone) startChores()
+                    },
+                    onNewChores = {
+                        progress = progress.withChores(emptyList())
+                        startChores()
+                    },
                     onJumpToMission = { screen = Screen.Play(it) },
                     // без статистики задание даёт одну звезду, как заглушка
                     onWinMission = { finishMission(MissionResult(it)) },
@@ -573,6 +614,7 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
                             DebugJump.SIGNAL_CHECK -> Screen.SignalCheck
                             DebugJump.BREAK -> Screen.Break(Screen.MainMenu)
                             DebugJump.SESSION_END -> Screen.SessionEnd(Screen.MainMenu)
+                            DebugJump.CHORES -> Screen.Chores
                         }
                     },
                     onResetCalibration = {

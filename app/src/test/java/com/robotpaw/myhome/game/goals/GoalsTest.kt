@@ -44,10 +44,13 @@ class GoalsTest {
     fun firstDayOnlyTutorialGoals() {
         val pool = GoalPicker.available(GameProgress(), canWarmUp = false)
         assertEquals(setOf(GoalKind.CLEAN, GoalKind.FREEZE, GoalKind.FLAWLESS), pool.toSet())
-        val goals = GoalPicker.pick(GameProgress(), canWarmUp = false, random = Random(1))
-        assertEquals(3, goals.size)
-        assertEquals(1, goals.count { it.challenge })
-        assertEquals(3, goals.map { it.kind }.toSet().size)
+        repeat(10) { seed ->
+            val goals = GoalPicker.pick(GameProgress(), canWarmUp = false, random = Random(seed))
+            // цель и челлендж
+            assertEquals(2, goals.size)
+            assertFalse(goals[0].challenge)
+            assertTrue(goals[1].challenge)
+        }
     }
 
     @Test
@@ -56,6 +59,21 @@ class GoalsTest {
         p = p.withGoalTry(GoalKind.FLAWLESS, true)
         val goals = GoalPicker.pick(p, canWarmUp = true, random = Random(7))
         assertEquals(GoalKind.FREEZE, goals.first().kind)
+    }
+
+    @Test
+    fun challengeIsSameMissionHarder() {
+        // у «Замри» есть уровни: челлендж - она же, на уровень выше
+        val p = GameProgress().withGoalTry(GoalKind.FREEZE, false).withGoalTry(GoalKind.CLEAN, true)
+        val goals = GoalPicker.pick(p, canWarmUp = false)
+        assertEquals(listOf(GoalKind.FREEZE, GoalKind.FREEZE), goals.map { it.kind })
+        assertEquals(listOf(0, 1), goals.map { it.tier })
+        // у «Чистой работы» уровней нет: челлендж - другая миссия с уровнями
+        val q = GameProgress().withGoalTry(GoalKind.CLEAN, false).withGoalTry(GoalKind.FREEZE, true).withGoalTry(GoalKind.FLAWLESS, true)
+        val other = GoalPicker.pick(q, canWarmUp = false)
+        assertEquals(GoalKind.CLEAN, other[0].kind)
+        assertEquals(GoalKind.FREEZE, other[1].kind)
+        assertTrue(other[1].challenge)
     }
 
     @Test

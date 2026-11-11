@@ -81,7 +81,8 @@ enum class DebugJump(val title: String) {
     GOALS("Цели"),
     SIGNAL_CHECK("Сигнал"),
     BREAK("Передышка"),
-    SESSION_END("Итог дня")
+    SESSION_END("Итог дня"),
+    CHORES("Дела")
 }
 
 private enum class DebugTab(val title: String) { ROOMS("Комнаты"), CHEATS("Читы"), SCREENS("Экраны") }
@@ -94,7 +95,8 @@ private enum class DebugTab(val title: String) { ROOMS("Комнаты"), CHEATS
  * @param session - тренировка за день (план и усталость)
  * @param onSessionChange - новая сессия после чита
  * @param onNewGoals - подобрать цели на сегодня заново
- * @param onNewDay - начать день заново: план и цели с нуля
+ * @param onNewDay - начать день заново: план, цели, квест и дела с нуля
+ * @param onNewChores - подобрать дела на сегодня заново (после сюжета)
  * @param onJumpToMission - открыть задание сразу, минуя меню и инструкцию
  * @param onWinMission - засчитать задание без игры: смена предмета и экран результата, как после настоящего прохождения
  * @param onJumpToRoom - открыть комнату; предыдущие комнаты при этом считаются пройденными
@@ -109,6 +111,7 @@ fun LevelSwitcher(
     onSessionChange: (Session) -> Unit,
     onNewGoals: () -> Unit,
     onNewDay: () -> Unit,
+    onNewChores: () -> Unit,
     onJumpToMission: (Mission) -> Unit,
     onWinMission: (Mission) -> Unit,
     onJumpToRoom: (Room) -> Unit,
@@ -189,6 +192,7 @@ fun LevelSwitcher(
                     onSessionChange = onSessionChange,
                     onNewGoals = onNewGoals,
                     onNewDay = onNewDay,
+                    onNewChores = onNewChores,
                     onResetCalibration = { expanded = false; onResetCalibration() }
                 )
                 DebugTab.SCREENS -> DebugJump.entries.chunked(3).forEach { row ->
@@ -256,6 +260,7 @@ private fun CheatsTab(
     onSessionChange: (Session) -> Unit,
     onNewGoals: () -> Unit,
     onNewDay: () -> Unit,
+    onNewChores: () -> Unit,
     onResetCalibration: () -> Unit
 ) {
     Section("Прогресс")
@@ -301,6 +306,18 @@ private fun CheatsTab(
         listOf(
             "Новые цели" to onNewGoals,
             "Выполнить все" to { onSessionChange(session.copy(goals = session.goals.map { it.copy(done = true) })) }
+        )
+    )
+
+    Section("Дела · ${if (progress.isStoryDone) "сделано ${session.choresDone.size} из ${session.chores.size}" else "после сюжета"}")
+    // дела подбираются только после сюжета: сначала «Открыть все»
+    ButtonRow(
+        listOf(
+            "Новые дела" to onNewChores,
+            "Все сделаны" to {
+                onSessionChange(session.copy(choresDone = session.chores.toSet()))
+                onProgressChange(progress.withChores(emptyList()))
+            }
         )
     )
 

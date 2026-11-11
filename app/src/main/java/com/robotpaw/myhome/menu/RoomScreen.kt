@@ -37,6 +37,7 @@ import com.robotpaw.myhome.ui.theme.HomeType
 /**
  * Комната, каждое задание - пункт меню (у новичка последний пункт - выход)
  * @param initialWall - с какого задания начать
+ * @param pending - дела на сегодня, ещё не сделанные: предмет снова «до», хоть задание и пройдено
  */
 @Composable
 fun RoomScreen(
@@ -46,15 +47,23 @@ fun RoomScreen(
     progress: GameProgress,
     initialWall: Int,
     onStart: (Mission) -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    pending: Set<String> = emptySet()
 ) {
     val missions = room.missions
+    // как выглядит предмет: дело на сегодня снова «до»
+    fun looksDone(m: Mission) = progress.isCompleted(m) && m.id !in pending
     val control = rememberMenuControl(
         source = source,
         profile = profile,
         items = missions.map {
             val locked = isLocked(it, progress)
-            MenuItem(it.wallTitle, if (locked) "Уже выполнено, повторить нельзя" else subtitleOf(it), done = progress.isCompleted(it))
+            val subtitle = when {
+                locked -> "Уже выполнено, повторить нельзя"
+                it.id in pending -> "Дело на сегодня · ${subtitleOf(it)}"
+                else -> subtitleOf(it)
+            }
+            MenuItem(it.wallTitle, subtitle, done = looksDone(it))
         },
         backTitle = "Выйти в меню",
         initialIndex = initialWall,
@@ -77,7 +86,7 @@ fun RoomScreen(
             RoomSceneView(
                 art = scene,
                 selected = mission.kind,
-                isDone = { kind -> missions.any { it.kind == kind && progress.isCompleted(it) } },
+                isDone = { kind -> missions.any { it.kind == kind && looksDone(it) } },
                 modifier = Modifier.weight(1f)
             )
         } else if (mission != null) {

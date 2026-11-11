@@ -6,8 +6,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.robotpaw.myhome.game.GameProgress
+import com.robotpaw.myhome.game.Mission
 import com.robotpaw.myhome.game.Room
 import com.robotpaw.myhome.game.Rooms
+import com.robotpaw.myhome.game.chores.Chores
 import com.robotpaw.myhome.game.goals.DailyGoal
 import com.robotpaw.myhome.game.quests.RealQuests
 import com.robotpaw.myhome.game.session.Session
@@ -54,12 +56,26 @@ fun MainMenuScreen(
     val unlocked = Rooms.ALL.count { progress.isUnlocked(it) }
     val levelText = if (profile.level == UserLevel.NOVICE) "новичок" else "опытный"
     val roomStars = progress.summaryOf(room)
+    // после сюжета вместо «Продолжить» - дела на сегодня
+    val continueItem = if (progress.isStoryDone) {
+        MenuItem(
+            "Дела на сегодня",
+            when {
+                session == null || session.chores.isEmpty() -> "новые дела по дому"
+                session.isChoresDone -> "всё сделано · ${session.chores.size} из ${session.chores.size}"
+                else -> "сделано ${session.choresDone.size} из ${session.chores.size}"
+            },
+            done = session?.isChoresDone == true
+        )
+    } else {
+        MenuItem("Продолжить тренировку", "${room.title} · ${progress.completedCount(room)} из ${room.requiredMissions.size} · ★ ${roomStars.stars} из ${roomStars.maxStars}")
+    }
 
     val control = rememberMenuControl(
         source = source,
         profile = profile,
         items = listOf(
-            MenuItem("Продолжить тренировку", "${room.title} · ${progress.completedCount(room)} из ${room.requiredMissions.size} · ★ ${roomStars.stars} из ${roomStars.maxStars}"),
+            continueItem,
             MenuItem("Все комнаты", "открыто $unlocked из ${Rooms.ALL.size}"),
             MenuItem(
                 "Цели на сегодня",
@@ -180,6 +196,47 @@ fun GoalsScreen(
         overline = "Подобрано для вас",
         subtitle = if (goals.isEmpty()) "Целей пока нет: откройте первую комнату."
         else "Выполнено ${session.goalsDone} из ${goals.size} · заданий сегодня ${session.done} из ${session.plan}",
+        backProgress = control.backProgress
+    ) {
+        MenuList(control)
+    }
+}
+
+/**
+ * Дела на сегодня после сюжета: выбор дела ведёт в комнату, к его предмету
+ * @param chores - задания-дела на сегодня
+ * @param onOpen - перейти к делу
+ */
+@Composable
+fun ChoresScreen(
+    source: SignalSource,
+    profile: SignalProfile,
+    session: Session,
+    chores: List<Mission>,
+    onOpen: (Mission) -> Unit,
+    onBack: () -> Unit
+) {
+    val control = rememberMenuControl(
+        source = source,
+        profile = profile,
+        items = chores.map { mission ->
+            val done = mission.id in session.choresDone
+            MenuItem(
+                mission.title,
+                "${Rooms.of(mission).title} · ${mission.wallTitle}" + if (done) " · сделано" else " · +${Chores.REWARD} ★",
+                done = done
+            )
+        },
+        backTitle = "В меню",
+        onBack = onBack,
+        onSelect = { index -> if (chores[index].id !in session.choresDone) onOpen(chores[index]) }
+    )
+
+    HomeScreen(
+        title = "Дела на сегодня",
+        overline = "Дом снова ждёт",
+        subtitle = if (session.isChoresDone) "Все дела сделаны. Завтра будут новые."
+        else "Сделано ${session.choresDone.size} из ${chores.size}. Это задания, которые даются хуже всего.",
         backProgress = control.backProgress
     ) {
         MenuList(control)

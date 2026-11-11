@@ -15,7 +15,8 @@ data class GameProgress(
     val stars: Map<String, Int> = emptyMap(),
     val bonusStars: Int = 0,
     val goalTries: Map<GoalKind, GoalTries> = emptyMap(),
-    val reflections: Map<RealQuest, Reflection> = emptyMap()
+    val reflections: Map<RealQuest, Reflection> = emptyMap(),
+    val chores: List<String> = emptyList()
 ) {
 
     fun withPet(pet: PetKind) = copy(pet = pet)
@@ -97,6 +98,14 @@ data class GameProgress(
         val index = Rooms.ALL.indexOf(room)
         return index <= 0 || isDone(Rooms.ALL[index - 1])
     }
+
+    // несделанные дела после сюжета: переходят на следующий день
+    fun withChores(ids: List<String>) = copy(chores = ids)
+
+    fun withChoreDone(missionId: String) = copy(chores = chores - missionId)
+
+    // сюжет пройден: дальше бесконечная игра, «Дела на сегодня»
+    val isStoryDone: Boolean get() = Rooms.ALL.all { isDone(it) }
 
     // первая непройденная комната, если пройдено всё - последняя
     fun currentRoom(): Room = Rooms.ALL.firstOrNull { !isDone(it) } ?: Rooms.ALL.last()

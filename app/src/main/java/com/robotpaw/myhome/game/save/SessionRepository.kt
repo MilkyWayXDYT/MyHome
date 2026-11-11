@@ -7,9 +7,9 @@ import com.robotpaw.myhome.game.session.Session
 
 /**
  * Сохраняет тренировку за день, чтобы план не начинался заново при каждом запуске
- * Формат строки: v3|день|заданий|план|сверх плана|звёзд|время в заданиях|цели|квест,
+ * Формат строки: v4|день|заданий|план|сверх плана|звёзд|время в заданиях|цели|квест|дела,
  * цель - МИССИЯ.уровень.челлендж.выполнена через запятую, «-» - целей нет,
- * квест - КВЕСТ.выполнен, «-» - квеста нет
+ * квест - КВЕСТ.выполнен, «-» - квеста нет, дела - id_задания.сделано через запятую, «-» - дел нет
  * Усталость не сохраняется: после перезапуска считаем, что рука отдохнула
  */
 class SessionRepository(private val storage: KeyValueStorage) {
@@ -19,7 +19,7 @@ class SessionRepository(private val storage: KeyValueStorage) {
      */
     fun load(today: String): Session {
         val parts = storage.getString(KEY_SESSION)?.split("|") ?: return Session(today)
-        if (parts.size != 9 || parts[0] != VERSION || parts[1] != today) return Session(today)
+        if (parts.size != 10 || parts[0] != VERSION || parts[1] != today) return Session(today)
         val done = parts[2].toIntOrNull() ?: return Session(today)
         val plan = parts[3].toIntOrNull() ?: return Session(today)
         val extra = parts[4].toIntOrNull() ?: return Session(today)
@@ -29,9 +29,11 @@ class SessionRepository(private val storage: KeyValueStorage) {
         val questParts = parts[8].split(".")
         val quest = RealQuest.entries.firstOrNull { it.name == questParts[0] }
         val questDone = quest != null && questParts.getOrNull(1) == "1"
+        val chores = if (parts[9] == "-") emptyList() else parts[9].split(",").map { it.split(".") }
         return Session(
             today, done = done, extra = extra, starsGained = stars, activeMs = activeMs,
-            goals = goals, quest = quest, questDone = questDone
+            goals = goals, quest = quest, questDone = questDone,
+            chores = chores.map { it[0] }, choresDone = chores.filter { it.getOrNull(1) == "1" }.map { it[0] }.toSet()
         ).withPlan(plan)
     }
 
@@ -47,7 +49,8 @@ class SessionRepository(private val storage: KeyValueStorage) {
                 session.starsGained.toString(),
                 session.activeMs.toString(),
                 session.goals.joinToString(",") { "${it.kind.name}.${it.tier}.${flag(it.challenge)}.${flag(it.done)}" }.ifEmpty { "-" },
-                session.quest?.let { "${it.name}.${flag(session.questDone)}" } ?: "-"
+                session.quest?.let { "${it.name}.${flag(session.questDone)}" } ?: "-",
+                session.chores.joinToString(",") { "$it.${flag(it in session.choresDone)}" }.ifEmpty { "-" }
             ).joinToString("|")
         )
     }
@@ -68,6 +71,6 @@ class SessionRepository(private val storage: KeyValueStorage) {
 
     companion object {
         const val KEY_SESSION = "session_day"
-        private const val VERSION = "v3"
+        private const val VERSION = "v4"
     }
 }

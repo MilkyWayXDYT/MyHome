@@ -147,10 +147,9 @@ data class DailyGoal(
 }
 
 /**
- * Подбор целей на день по правилам команды:
- * одна - под самый слабый навык (первым идёт навык, где квест в жизни «не вышел»),
- * одна - случайная из открытых, третья - необязательный челлендж.
- * Цели берутся только из открытых комнат, при усталости - одна цель без челленджа
+ * Подбор целей на день: одна цель под самый слабый навык (первым идёт навык, где квест в жизни «не вышел»)
+ * и необязательный челлендж - та же миссия на уровень сложнее. Квест в жизни подбирается отдельно, в RealQuests
+ * Цели берутся только из открытых комнат, при усталости - без челленджа
  */
 object GoalPicker {
     const val WINS_PER_TIER = 3   // столько раз выполнить миссию, чтобы её уровень вырос
@@ -187,20 +186,21 @@ object GoalPicker {
         val weakest = pool.firstOrNull { it in failed }
             ?: tried.minByOrNull { progress.goalTriesOf(it).rate }
             ?: pool.random(random)
-        result += DailyGoal(weakest, tierOf(weakest, progress))
+        val tier = tierOf(weakest, progress)
+        result += DailyGoal(weakest, tier)
+        if (tired) return result
+
+        // челлендж: та же миссия на уровень сложнее; если выше некуда или уровней нет - другая миссия с уровнями
+        if (tier + 1 < weakest.tiers.size) {
+            result += DailyGoal(weakest, tier + 1, challenge = true)
+            return result
+        }
         pool -= weakest
-        if (tired || pool.isEmpty()) return result
-
-        val other = pool.random(random)
-        result += DailyGoal(other, tierOf(other, progress))
-        pool -= other
         if (pool.isEmpty()) return result
-
-        // челлендж: лучше миссия с уровнями, тогда уровень на ступень выше
-        val withTiers = pool.filter { it.tiers.size > 1 }
-        val challenge = if (withTiers.isNotEmpty()) withTiers.random(random) else pool.random(random)
-        val tier = (tierOf(challenge, progress) + 1).coerceAtMost((challenge.tiers.size - 1).coerceAtLeast(0))
-        result += DailyGoal(challenge, tier, challenge = true)
+        val withTiers = pool.filter { it.tiers.size > 1 && tierOf(it, progress) + 1 < it.tiers.size }
+        val other = if (withTiers.isNotEmpty()) withTiers.random(random) else pool.random(random)
+        val otherTier = (tierOf(other, progress) + 1).coerceAtMost((other.tiers.size - 1).coerceAtLeast(0))
+        result += DailyGoal(other, otherTier, challenge = true)
         return result
     }
 

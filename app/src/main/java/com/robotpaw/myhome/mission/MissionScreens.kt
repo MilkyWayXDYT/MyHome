@@ -26,6 +26,7 @@ import com.robotpaw.myhome.game.Stars
 import com.robotpaw.myhome.game.StarsOutcome
 import com.robotpaw.myhome.game.formatTime
 import com.robotpaw.myhome.game.MissionResult
+import com.robotpaw.myhome.game.chores.Chores
 import com.robotpaw.myhome.game.goals.DailyGoal
 import com.robotpaw.myhome.menu.MenuItem
 import com.robotpaw.myhome.menu.MenuList
@@ -210,6 +211,7 @@ fun ResultScreen(
     record: RecordOutcome,
     stars: StarsOutcome,
     goals: List<DailyGoal> = emptyList(),
+    chore: Boolean = false,
     onChoice: (ResultChoice) -> Unit
 ) {
     val control = rememberMenuControl(
@@ -249,6 +251,13 @@ fun ResultScreen(
                 fontSize = HomeType.Label, color = HomeColors.InkSecondary
             )
             StatRow("Всего звёзд", stars.total.toString())
+        }
+        // дело на сегодня (после сюжета)
+        if (chore) {
+            HomeCard(highlighted = true) {
+                Text("Дело на сегодня сделано", fontSize = HomeType.Body, fontWeight = FontWeight.ExtraBold, color = HomeColors.Ink)
+                Text("+${Chores.REWARD} ${Stars.word(Chores.REWARD)}", fontSize = HomeType.Label, fontWeight = FontWeight.Bold, color = HomeColors.Accent)
+            }
         }
         // цели на сегодня, которые выполнило это задание
         goals.forEach { goal ->
