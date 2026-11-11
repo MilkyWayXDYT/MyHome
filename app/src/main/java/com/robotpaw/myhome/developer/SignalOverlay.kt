@@ -1,6 +1,5 @@
 package com.robotpaw.myhome.developer
 
-import android.os.SystemClock
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -13,56 +12,55 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.delay
+import com.robotpaw.myhome.emulator.EmulatorPreset
+import com.robotpaw.myhome.emulator.EmulatorSignalSource
+import com.robotpaw.myhome.signal.Channel
 import com.robotpaw.myhome.signal.NoiseSettings
-import com.robotpaw.myhome.signal.SignalProcessor
+import kotlin.reflect.KProperty
 
+/**
+ * Панель эмулятора.
+ *
+ * @param stateCode код состояния после обработки игрой (с порогами профиля).
+ * @param latencyMs задержка от выдачи кадра до кадра отрисовки.
+ */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SignalOverlay(
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
-    flexor: Int,
-    extensor: Int,
-    onFlexorChange: (Int) -> Unit,
-    onExtensorChange: (Int) -> Unit,
+    emulator: EmulatorSignalSource,
+    stateCode: String,
+    latencyMs: Long?,
     modifier: Modifier = Modifier
 ) {
-    var noiseSettings by remember {
-        mutableStateOf(NoiseSettings())
+    val raw by emulator.raw.collectAsState()
+    val settings by emulator.settings.collectAsState()
+    val frame by emulator.frames.collectAsState()
+
+    val flexor = raw.flexor
+    val extensor = raw.extensor
+    val onFlexorChange: (Int) -> Unit = { emulator.setChannel(Channel.FLEXOR, it) }
+    val onExtensorChange: (Int) -> Unit = { emulator.setChannel(Channel.EXTENSOR, it) }
+
+    var noiseSettings by EmulatorField({ settings.noise }) { v ->
+        emulator.updateSettings { it.copy(noise = v) }
     }
 
-    var elapsedMillis by remember {
-        mutableLongStateOf(SystemClock.elapsedRealtime())
+    var fatigueEnabled by EmulatorField({ settings.fatigueEnabled }) { v ->
+        emulator.updateSettings { it.copy(fatigueEnabled = v) }
     }
 
-    // Усталость — отдельный параметр эмулятора.
-    var fatigueEnabled by remember {
-        mutableStateOf(false)
+    var fatigueLevel by EmulatorField({ settings.fatigueLevel }) { v ->
+        emulator.updateSettings { it.copy(fatigueLevel = v) }
     }
 
-    var fatigueLevel by remember {
-        mutableIntStateOf(0)
-    }
-
-    val processor = remember {
-        SignalProcessor()
-    }
-
-    // Обновляем время, чтобы шумы менялись непрерывно.
-    LaunchedEffect(noiseSettings.enabled) {
-        if (noiseSettings.enabled) {
-            while (true) {
-                elapsedMillis = SystemClock.elapsedRealtime()
-                delay(50)
-            }
-        }
-    }
-
-    val signal = processor.process(
+    val signal = OverlaySignal(
         rawFlexor = flexor,
         rawExtensor = extensor,
-        noiseSettings = noiseSettings,
-        elapsedMillis = elapsedMillis
+        flexor = frame.flexor,
+        extensor = frame.extensor,
+        stateCode = stateCode
     )
 
     val activeNoiseNames = listOfNotNull(
@@ -117,9 +115,34 @@ fun SignalOverlay(
                 HorizontalDivider()
                 Spacer(Modifier.height(12.dp))
 
+                // БЫСТРЫЕ НАБОРЫ ПОМЕХ
+
+                Text(
+                    "Быстрые наборы",
+                    fontWeight = FontWeight.Bold
+                )
+
+                // Наборов пять — переносим кнопки на следующую строку, если не влезают.
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    EmulatorPreset.entries.forEach { preset ->
+                        OutlinedButton(onClick = { emulator.applyPreset(preset) }) {
+                            Text(preset.title)
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(8.dp))
+                HorizontalDivider()
+                Spacer(Modifier.height(12.dp))
+
                 Text(
                     "Исходные сигналы",
                     fontWeight = FontWeight.Bold
+                )
+
+                Text(
+                    "Клавиатура: F — сгибатель, J — разгибатель, с Shift — сильнее. Геймпад: L2 / R2.",
+                    fontSize = 12.sp
                 )
 
                 Text(
@@ -142,6 +165,31 @@ fun SignalOverlay(
                     value = extensor.toFloat(),
                     onValueChange = { onExtensorChange(it.toInt()) },
                     valueRange = 0f..100f
+                )
+
+                Spacer(Modifier.height(8.dp))
+                HorizontalDivider()
+                Spacer(Modifier.height(12.dp))
+
+                // ПЕРЕКРЁСТНАЯ НАВОДКА
+
+                Text(
+                    "Перекрёстная наводка: ${settings.crosstalkPercent}%",
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Text(
+                    "Часть сигнала одного канала попадает в другой — так выглядит встречный сигнал новичка.",
+                    fontSize = 12.sp
+                )
+
+                Slider(
+                    value = settings.crosstalkPercent.toFloat(),
+                    onValueChange = { v ->
+                        emulator.updateSettings { it.copy(crosstalkPercent = v.toInt()) }
+                    },
+                    valueRange = 0f..60f
                 )
 
                 Spacer(Modifier.height(8.dp))
@@ -310,6 +358,22 @@ fun SignalOverlay(
                     )
                 }
 
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Нарастает сама при нагрузке")
+
+                    Switch(
+                        checked = settings.fatigueAuto,
+                        enabled = fatigueEnabled,
+                        onCheckedChange = { checked ->
+                            emulator.updateSettings { it.copy(fatigueAuto = checked) }
+                        }
+                    )
+                }
+
                 Text(
                     if (fatigueEnabled) {
                         "Уровень усталости: $fatigueLevel%"
@@ -325,7 +389,7 @@ fun SignalOverlay(
                         fatigueLevel = it.toInt()
                     },
                     valueRange = 0f..100f,
-                    enabled = fatigueEnabled
+                    enabled = fatigueEnabled && !settings.fatigueAuto
                 )
 
                 LinearProgressIndicator(
@@ -372,6 +436,11 @@ fun SignalOverlay(
                     fontWeight = FontWeight.SemiBold
                 )
 
+                Text(
+                    "Задержка сигнал → кадр: ${latencyMs?.let { "$it мс" } ?: "—"} (по ТЗ — до 100 мс)",
+                    fontSize = 13.sp
+                )
+
                 Spacer(Modifier.height(10.dp))
 
                 Card(
@@ -390,7 +459,7 @@ fun SignalOverlay(
                     ) {
                         Column {
                             Text(
-                                "Распознанное состояние",
+                                "Распознанное состояние (с порогами профиля)",
                                 fontSize = 13.sp
                             )
 
@@ -428,6 +497,23 @@ fun SignalOverlay(
             }
         }
     }
+}
+
+/**Блок «Результат обработки сигнала». */
+private data class OverlaySignal(
+    val rawFlexor: Int,
+    val rawExtensor: Int,
+    val flexor: Int,
+    val extensor: Int,
+    val stateCode: String
+)
+
+private class EmulatorField<T>(
+    private val read: () -> T,
+    private val write: (T) -> Unit
+) {
+    operator fun getValue(thisRef: Any?, property: KProperty<*>): T = read()
+    operator fun setValue(thisRef: Any?, property: KProperty<*>, value: T) = write(value)
 }
 
 @Composable
