@@ -2,26 +2,20 @@ package com.robotpaw.myhome.menu
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.robotpaw.myhome.game.GameProgress
 import com.robotpaw.myhome.game.Room
 import com.robotpaw.myhome.game.Rooms
+import com.robotpaw.myhome.game.goals.DailyGoal
 import com.robotpaw.myhome.game.session.Session
 import com.robotpaw.myhome.signal.SignalProfile
 import com.robotpaw.myhome.signal.SignalSource
 import com.robotpaw.myhome.signal.UserLevel
-import com.robotpaw.myhome.ui.components.HomeCard
 import com.robotpaw.myhome.ui.components.HomeScreen
 import com.robotpaw.myhome.ui.components.MenuItemCard
 import com.robotpaw.myhome.ui.components.StarsBadge
-import com.robotpaw.myhome.ui.theme.HomeColors
-import com.robotpaw.myhome.ui.theme.HomeType
 
 @Composable
 fun MenuList(control: MenuControl, modifier: Modifier = Modifier) {
@@ -43,7 +37,7 @@ enum class MainMenuChoice { CONTINUE, ROOMS, GOALS, SIGNAL_CHECK, RECALIBRATE, G
 
 /**
  * Главное меню
- * @param session - тренировка за день, для строки «сегодня 1 из 3»
+ * @param session - тренировка за день, для строки «выполнено 1 из 3» у целей
  * @param showDeveloperItems - пункт «Витрина компонентов» (только debug)
  */
 @Composable
@@ -69,11 +63,11 @@ fun MainMenuScreen(
             MenuItem(
                 "Цели на сегодня",
                 when {
-                    session == null -> "что даёт звёзды"
-                    session.isPlanDone -> "план выполнен · ${session.done} из ${session.plan}"
-                    else -> "сегодня ${session.done} из ${session.plan}"
+                    session == null || session.goals.isEmpty() -> "что даёт звёзды"
+                    session.isGoalsDone -> "всё выполнено · ${session.goalsDone} из ${session.goals.size}"
+                    else -> "выполнено ${session.goalsDone} из ${session.goals.size}"
                 },
-                done = session?.isPlanDone == true
+                done = session?.isGoalsDone == true
             ),
             MenuItem("Проверка сигнала", "код состояния и команды меню"),
             MenuItem("Калибровка заново", "сейчас режим: $levelText")
@@ -130,40 +124,49 @@ fun RoomsScreen(
 }
 
 /**
- * Цели на сегодня (заглушка, только вёрстка)
+ * Цели на сегодня: 1-3 миссии из открытых комнат. Выбор цели ведёт к подходящему заданию
+ * @param session - цели и план на сегодня
+ * @param onOpen - перейти к заданию для цели
  */
 @Composable
 fun GoalsScreen(
     source: SignalSource,
     profile: SignalProfile,
+    session: Session,
+    onOpen: (DailyGoal) -> Unit,
     onBack: () -> Unit
 ) {
+    val goals = session.goals
     val control = rememberMenuControl(
         source = source,
         profile = profile,
-        items = emptyList(),
+        items = goals.map { goal ->
+            val note = when {
+                goal.done -> "выполнено · +${goal.reward} ★"
+                session.isPostponed(goal) -> "отложено: рука устала"
+                else -> "+${goal.reward} ★"
+            }
+            MenuItem(
+                title = if (goal.challenge) "${goal.kind.title} · челлендж" else goal.kind.title,
+                subtitle = listOfNotNull(goal.condition, goal.kind.where, note).joinToString("\n"),
+                done = goal.done
+            )
+        },
         backTitle = "В меню",
         onBack = onBack,
-        onSelect = {}
+        onSelect = { index ->
+            val goal = goals[index]
+            if (!goal.done && !session.isPostponed(goal)) onOpen(goal)
+        }
     )
 
     HomeScreen(
         title = "Цели на сегодня",
         overline = "Подобрано для вас",
+        subtitle = if (goals.isEmpty()) "Целей пока нет: откройте первую комнату."
+        else "Выполнено ${session.goalsDone} из ${goals.size} · заданий сегодня ${session.done} из ${session.plan}",
         backProgress = control.backProgress
     ) {
-        listOf("Цель 1", "Цель 2", "Цель 3").forEach { title ->
-            HomeCard {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        title, fontSize = HomeType.Heading, fontWeight = FontWeight.ExtraBold,
-                        color = HomeColors.Ink, modifier = Modifier.weight(1f)
-                    )
-                    Text("+★", fontSize = HomeType.Body, fontWeight = FontWeight.Bold, color = HomeColors.Extensor)
-                }
-                Text("Описание цели", fontSize = HomeType.Label, color = HomeColors.InkSecondary)
-            }
-        }
         MenuList(control)
     }
 }

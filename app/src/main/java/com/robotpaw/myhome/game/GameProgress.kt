@@ -1,5 +1,8 @@
 package com.robotpaw.myhome.game
 
+import com.robotpaw.myhome.game.goals.GoalKind
+import com.robotpaw.myhome.game.goals.GoalTries
+
 /**
  * Пройденные задания, выбранный питомец, лучшие результаты и звёзды
  */
@@ -7,7 +10,9 @@ data class GameProgress(
     val completedMissions: Set<String> = emptySet(),
     val pet: PetKind? = null,
     val records: Map<String, MissionRecord> = emptyMap(),
-    val stars: Map<String, Int> = emptyMap()
+    val stars: Map<String, Int> = emptyMap(),
+    val bonusStars: Int = 0,
+    val goalTries: Map<GoalKind, GoalTries> = emptyMap()
 ) {
 
     fun withPet(pet: PetKind) = copy(pet = pet)
@@ -17,8 +22,19 @@ data class GameProgress(
     // лучшее число звёзд за задание (0, если звёзд ещё нет)
     fun starsOf(mission: Mission): Int = stars[mission.id] ?: 0
 
-    // всего звёзд у игрока: сумма лучших результатов по заданиям
-    val totalStars: Int get() = stars.values.sum()
+    // всего звёзд у игрока: лучшие результаты по заданиям и звёзды за цели дня
+    val totalStars: Int get() = stars.values.sum() + bonusStars
+
+    // звёзды за цели на сегодня
+    fun withBonusStars(count: Int) = copy(bonusStars = bonusStars + count)
+
+    fun goalTriesOf(kind: GoalKind): GoalTries = goalTries[kind] ?: GoalTries()
+
+    /**
+     * Запоминает попытку миссии (для поиска слабого навыка)
+     * @param won - миссия выполнена
+     */
+    fun withGoalTry(kind: GoalKind, won: Boolean) = copy(goalTries = goalTries + (kind to goalTriesOf(kind).with(won)))
 
     /**
      * Сколько звёзд даст это прохождение. Считать нужно до withResult

@@ -31,18 +31,22 @@ private enum class WelcomePhase { MENU, CHECK, FAILED }
  * Если на разминке сигнал не похож на прошлый раз, предлагаем пройти калибровку
  * @param profile - сохранённый профиль с прошлой калибровки
  * @param onReady - разминка пройдена или игрок решил продолжить без неё
+ * @param startWithCheck - сразу разминка, без вопроса (из целей на сегодня)
+ * @param onPassed - разминка пройдена целиком (цель «Разминка»), зовётся перед onReady
  */
 @Composable
 fun WelcomeBackScreen(
     source: SignalSource,
     profile: SignalProfile,
     onReady: () -> Unit,
-    onRecalibrate: () -> Unit
+    onRecalibrate: () -> Unit,
+    startWithCheck: Boolean = false,
+    onPassed: () -> Unit = {}
 ) {
-    var phase by remember { mutableStateOf(WelcomePhase.MENU) }
+    var phase by remember { mutableStateOf(if (startWithCheck) WelcomePhase.CHECK else WelcomePhase.MENU) }
     when (phase) {
         WelcomePhase.MENU -> WelcomeMenu(source, profile, onCheck = { phase = WelcomePhase.CHECK }, onRecalibrate = onRecalibrate)
-        WelcomePhase.CHECK -> WarmUp(source, profile, onPassed = onReady, onFailed = { phase = WelcomePhase.FAILED })
+        WelcomePhase.CHECK -> WarmUp(source, profile, onPassed = { onPassed(); onReady() }, onFailed = { phase = WelcomePhase.FAILED })
         WelcomePhase.FAILED -> CheckFailed(source, profile, onRecalibrate = onRecalibrate, onContinue = onReady)
     }
 }

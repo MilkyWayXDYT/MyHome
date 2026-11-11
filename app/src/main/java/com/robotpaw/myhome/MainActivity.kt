@@ -38,10 +38,16 @@ import com.robotpaw.myhome.game.PetKind
 import com.robotpaw.myhome.game.RecordOutcome
 import com.robotpaw.myhome.game.StarsOutcome
 import com.robotpaw.myhome.game.toStats
-import com.robotpaw.myhome.game.RoomKind
+import com.robotpaw.myhome.game.RecordStatus
+import com.robotpaw.myhome.game.goals.DailyGoal
+import com.robotpaw.myhome.game.goals.GoalContext
+import com.robotpaw.myhome.game.goals.GoalKind
+import com.robotpaw.myhome.game.goals.GoalPicker
+import com.robotpaw.myhome.game.goals.isMet
 import com.robotpaw.myhome.game.save.ProfileRepository
 import com.robotpaw.myhome.game.save.SessionRepository
 import com.robotpaw.myhome.game.session.Fatigue
+import com.robotpaw.myhome.game.session.Session
 import com.robotpaw.myhome.game.session.SessionAdvice
 import com.robotpaw.myhome.game.save.ProgressRepository
 import com.robotpaw.myhome.game.save.SharedPreferencesStorage
@@ -156,6 +162,8 @@ private sealed interface Screen {
     data object Calibration : Screen
     // повторный запуск: разминка вместо калибровки
     data object WelcomeBack : Screen
+    // разминка из целей на сегодня
+    data object WarmUp : Screen
     data object MainMenu : Screen
     data object Goals : Screen
     data object SignalCheck : Screen
@@ -167,7 +175,14 @@ private sealed interface Screen {
     data class Play(val mission: Mission, val checkpoint: MissionCheckpoint = MissionCheckpoint()) : Screen
     data class Pause(val mission: Mission, val checkpoint: MissionCheckpoint) : Screen
     // roomCompleted - этим заданием пройдена вся комната
-    data class Result(val result: MissionResult, val roomCompleted: Boolean, val record: RecordOutcome, val stars: StarsOutcome) : Screen
+    // goals - цели на сегодня, выполненные этим заданием
+    data class Result(
+        val result: MissionResult,
+        val roomCompleted: Boolean,
+        val record: RecordOutcome,
+        val stars: StarsOutcome,
+        val goals: List<DailyGoal> = emptyList()
+    ) : Screen
     // предмет в комнате меняется на «после», затем экран результата next
     data class Change(val next: Result) : Screen
     // передышка между заданиями, потом экран next
@@ -192,15 +207,20 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
     var progress by remember { mutableStateOf(repository.load()) }
     LaunchedEffect(progress) { repository.save(progress) }
 
-    // Тренировка за день: план 1-3 задания (лимит мягкий) и усталость
-    val sessionRepository = remember { SessionRepository(storage) }
-    var session by remember { mutableStateOf(sessionRepository.load(java.time.LocalDate.now().toString())) }
-    LaunchedEffect(session) { sessionRepository.save(session) }
-
     // Первый запуск - калибровка. Дальше калибровку можно пропустить: короткая разминка с сохранённым профилем
     val savedProfile = remember { profileRepository.load() }
     var profile by remember { mutableStateOf(savedProfile ?: SignalProfile()) }
     var screen by remember { mutableStateOf<Screen>(if (savedProfile != null) Screen.WelcomeBack else Screen.Calibration) }
+
+    // Тренировка за день: цели на сегодня (1-3), по ним план заданий (лимит мягкий), и усталость
+    // Цели подбираются один раз в день из открытых комнат
+    val sessionRepository = remember { SessionRepository(storage) }
+    fun pickGoals(tired: Boolean = false) = GoalPicker.pick(progress, canWarmUp = profileRepository.load() != null, tired = tired)
+    var session by remember {
+        val loaded = sessionRepository.load(java.time.LocalDate.now().toString())
+        mutableStateOf(if (loaded.goals.isEmpty()) loaded.withGoals(pickGoals()) else loaded)
+    }
+    LaunchedEffect(session) { sessionRepository.save(session) }
 
     var overlayExpanded by rememberSaveable {
         mutableStateOf(false)
@@ -238,16 +258,43 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
         }
     }
 
-    // Задание пройдено: засчитать результат, показать смену предмета (если есть сцена) и экран результата
+    // Задание пройдено: засчитать результат и цели дня, показать смену предмета (если есть сцена) и экран результата
     fun finishMission(result: MissionResult) {
         val room = Rooms.of(result.mission)
+        val kind = result.mission.kind
         val wasDone = progress.isDone(room)
         val record = RecordOutcome.of(result, progress.recordOf(result.mission))
         val stars = progress.starsFor(result)
-        progress = progress.withResult(result)
-        session = session.withResult(result.log.toStats(), stars.gained, countsForPlan = room.kind != RoomKind.TUTORIAL)
-        val resultScreen = Screen.Result(result, roomCompleted = !wasDone && progress.isDone(room), record = record, stars = stars)
+        session = session.withResult(result.log.toStats(), stars.gained)
+        val ctx = GoalContext(kind, result.log, newRecord = record.status == RecordStatus.NEW, flawlessStreak = session.flawlessStreak)
+        val (checked, goalsDone) = session.withGoalsChecked(ctx)
+        session = checked
+
+        // попытки навыков для подбора целей: миссии, привязанные к заданиям (рекорд и серия - не навык)
+        var updated = progress.withResult(result).withBonusStars(goalsDone.sumOf { it.reward })
+        GoalKind.entries
+            .filter { it.appliesTo(kind) && it != GoalKind.RECORD && it != GoalKind.FLAWLESS }
+            .forEach { goal ->
+                val value = goal.tiers.getOrElse(GoalPicker.tierOf(goal, progress)) { 0 }
+                updated = updated.withGoalTry(goal, goal.isMet(ctx, value))
+            }
+        progress = updated
+
+        val resultScreen = Screen.Result(
+            result,
+            roomCompleted = !wasDone && progress.isDone(room),
+            record = record,
+            stars = stars.copy(total = progress.totalStars),
+            goals = goalsDone
+        )
         screen = if (RoomScenes.of(result.mission.kind) != null) Screen.Change(resultScreen) else resultScreen
+    }
+
+    // Разминка пройдена: цель «Разминка» и попытка навыка
+    fun warmUpPassed() {
+        val (checked, goalsDone) = session.withWarmUpDone()
+        session = checked
+        progress = progress.withBonusStars(goalsDone.sumOf { it.reward }).withGoalTry(GoalKind.WARM_UP, true)
     }
 
     // После задания: при усталости сначала передышка, а если план выполнен или рука сильно устала - предложить закончить
@@ -278,7 +325,17 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
                     source = emulator,
                     profile = profile,
                     onReady = { screen = Screen.MainMenu },
-                    onRecalibrate = { screen = Screen.Calibration }
+                    onRecalibrate = { screen = Screen.Calibration },
+                    onPassed = { warmUpPassed() }
+                )
+
+                Screen.WarmUp -> WelcomeBackScreen(
+                    source = emulator,
+                    profile = profile,
+                    onReady = { screen = Screen.Goals },
+                    onRecalibrate = { screen = Screen.Calibration },
+                    startWithCheck = true,
+                    onPassed = { warmUpPassed() }
                 )
 
                 Screen.MainMenu -> MainMenuScreen(
@@ -302,6 +359,15 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
                 Screen.Goals -> GoalsScreen(
                     source = emulator,
                     profile = profile,
+                    session = session,
+                    onOpen = { goal ->
+                        screen = when (goal.kind) {
+                            GoalKind.WARM_UP -> Screen.WarmUp
+                            // подходящее задание в открытой комнате, для «любых» - текущая комната
+                            else -> GoalPicker.missionFor(goal.kind, progress)?.let { roomScreenOf(it) }
+                                ?: Screen.Room(progress.currentRoom().id)
+                        }
+                    },
                     onBack = { screen = Screen.MainMenu }
                 )
 
@@ -384,6 +450,7 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
                     stats = current.result.log.toStats(),
                     record = current.record,
                     stars = current.stars,
+                    goals = current.goals,
                     onChoice = { choice ->
                         screen = afterMission(when (choice) {
                             ResultChoice.ROOM -> {
@@ -459,6 +526,8 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
                     onProgressChange = { progress = it },
                     session = session,
                     onSessionChange = { session = it },
+                    onNewGoals = { session = session.withGoals(pickGoals(tired = session.fatigue == Fatigue.TIRED)) },
+                    onNewDay = { session = Session(session.day).withGoals(pickGoals()) },
                     onJumpToMission = { screen = Screen.Play(it) },
                     // без статистики задание даёт одну звезду, как заглушка
                     onWinMission = { finishMission(MissionResult(it)) },

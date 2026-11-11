@@ -92,6 +92,8 @@ private enum class DebugTab(val title: String) { ROOMS("Комнаты"), CHEATS
  * @param onProgressChange - новый прогресс после чита
  * @param session - тренировка за день (план и усталость)
  * @param onSessionChange - новая сессия после чита
+ * @param onNewGoals - подобрать цели на сегодня заново
+ * @param onNewDay - начать день заново: план и цели с нуля
  * @param onJumpToMission - открыть задание сразу, минуя меню и инструкцию
  * @param onWinMission - засчитать задание без игры: смена предмета и экран результата, как после настоящего прохождения
  * @param onJumpToRoom - открыть комнату; предыдущие комнаты при этом считаются пройденными
@@ -104,6 +106,8 @@ fun LevelSwitcher(
     onProgressChange: (GameProgress) -> Unit,
     session: Session,
     onSessionChange: (Session) -> Unit,
+    onNewGoals: () -> Unit,
+    onNewDay: () -> Unit,
     onJumpToMission: (Mission) -> Unit,
     onWinMission: (Mission) -> Unit,
     onJumpToRoom: (Room) -> Unit,
@@ -182,6 +186,8 @@ fun LevelSwitcher(
                     onProgressChange = onProgressChange,
                     session = session,
                     onSessionChange = onSessionChange,
+                    onNewGoals = onNewGoals,
+                    onNewDay = onNewDay,
                     onResetCalibration = { expanded = false; onResetCalibration() }
                 )
                 DebugTab.SCREENS -> DebugJump.entries.chunked(3).forEach { row ->
@@ -247,6 +253,8 @@ private fun CheatsTab(
     onProgressChange: (GameProgress) -> Unit,
     session: Session,
     onSessionChange: (Session) -> Unit,
+    onNewGoals: () -> Unit,
+    onNewDay: () -> Unit,
     onResetCalibration: () -> Unit
 ) {
     Section("Прогресс")
@@ -277,8 +285,21 @@ private fun CheatsTab(
     ButtonRow(Fatigue.entries.map { f -> f.title to { onSessionChange(session.copy(forcedFatigue = f)) } })
     ButtonRow(
         listOf(
-            "Новый день" to { onSessionChange(Session(session.day)) },
+            "Новый день" to onNewDay,
             "+1 задание" to { onSessionChange(session.copy(done = session.done + 1)) }
+        )
+    )
+
+    Section("Цели · выполнено ${session.goalsDone} из ${session.goals.size}")
+    session.goals.forEach { goal ->
+        val mark = if (goal.done) "✓ " else ""
+        val extra = if (goal.challenge) " (челлендж)" else ""
+        Text("$mark${goal.kind.title}$extra: ${goal.condition}", fontSize = 13.sp, color = HomeColors.InkSecondary)
+    }
+    ButtonRow(
+        listOf(
+            "Новые цели" to onNewGoals,
+            "Выполнить все" to { onSessionChange(session.copy(goals = session.goals.map { it.copy(done = true) })) }
         )
     )
 

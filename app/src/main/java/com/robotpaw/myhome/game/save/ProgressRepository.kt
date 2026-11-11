@@ -5,9 +5,12 @@ import com.robotpaw.myhome.game.MissionRecord
 import com.robotpaw.myhome.game.PetKind
 import com.robotpaw.myhome.game.Rooms
 import com.robotpaw.myhome.game.Stars
+import com.robotpaw.myhome.game.goals.GoalKind
+import com.robotpaw.myhome.game.goals.GoalTries
 
 /**
- * Сохраняет и загружает прогресс игры: пройденные задания, выбранного питомца, лучшие результаты и звёзды
+ * Сохраняет и загружает прогресс игры: пройденные задания, выбранного питомца, лучшие результаты, звёзды
+ * и попытки миссий (по ним ищется слабый навык)
  * Профиль калибровки хранится отдельно, в ProfileRepository
  * Новые данные (звёзды, лучшие результаты) добавляются сюда же отдельными ключами
  */
@@ -23,7 +26,9 @@ class ProgressRepository(private val storage: KeyValueStorage) {
         val pet = storage.getString(KEY_PET)?.let { name -> PetKind.entries.firstOrNull { it.name == name } }
         val records = knownMissions.mapNotNull { id -> parseRecord(storage.getString(recordKey(id)))?.let { id to it } }.toMap()
         val stars = knownMissions.mapNotNull { id -> storage.getString(starsKey(id))?.toIntOrNull()?.let { id to it.coerceIn(0, Stars.MAX) } }.toMap()
-        return GameProgress(completedMissions = completed, pet = pet, records = records, stars = stars)
+        val bonus = storage.getString(KEY_BONUS_STARS)?.toIntOrNull()?.coerceAtLeast(0) ?: 0
+        val tries = GoalKind.entries.mapNotNull { kind -> parseTries(storage.getString(triesKey(kind)))?.let { kind to it } }.toMap()
+        return GameProgress(completedMissions = completed, pet = pet, records = records, stars = stars, bonusStars = bonus, goalTries = tries)
     }
 
     fun save(progress: GameProgress) {
@@ -34,6 +39,20 @@ class ProgressRepository(private val storage: KeyValueStorage) {
             storage.putString(recordKey(mission.id), progress.records[mission.id]?.let { encodeRecord(it) })
             storage.putString(starsKey(mission.id), progress.stars[mission.id]?.toString())
         }
+        storage.putString(KEY_BONUS_STARS, progress.bonusStars.takeIf { it > 0 }?.toString())
+        GoalKind.entries.forEach { kind ->
+            storage.putString(triesKey(kind), progress.goalTries[kind]?.let { "${it.tries};${it.wins}" })
+        }
+    }
+
+    private fun triesKey(kind: GoalKind) = "$KEY_GOAL_PREFIX${kind.name}"
+
+    private fun parseTries(text: String?): GoalTries? {
+        val parts = text?.split(";") ?: return null
+        if (parts.size != 2) return null
+        val tries = parts[0].toIntOrNull() ?: return null
+        val wins = parts[1].toIntOrNull() ?: return null
+        return GoalTries(tries, wins.coerceAtMost(tries))
     }
 
     private fun recordKey(missionId: String) = "$KEY_RECORD_PREFIX$missionId"
@@ -56,5 +75,7 @@ class ProgressRepository(private val storage: KeyValueStorage) {
         const val KEY_PET = "pet"
         const val KEY_RECORD_PREFIX = "record_"
         const val KEY_STARS_PREFIX = "stars_"
+        const val KEY_BONUS_STARS = "bonus_stars"
+        const val KEY_GOAL_PREFIX = "goal_"
     }
 }

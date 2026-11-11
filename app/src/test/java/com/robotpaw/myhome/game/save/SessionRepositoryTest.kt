@@ -45,3 +45,17 @@ class SessionRepositoryTest {
         assertEquals(Session(day), SessionRepository(storage).load(day))
     }
 }
+
+class SessionGoalsSaveTest {
+    @Test
+    fun goalsSurviveRestart() {
+        val storage = SessionMemoryStorage()
+        val goals = listOf(
+            com.robotpaw.myhome.game.goals.DailyGoal(com.robotpaw.myhome.game.goals.GoalKind.FREEZE, tier = 1, challenge = true, done = true),
+            com.robotpaw.myhome.game.goals.DailyGoal(com.robotpaw.myhome.game.goals.GoalKind.CLEAN)
+        )
+        val saved = Session("2026-11-11").withGoals(goals)
+        SessionRepository(storage).save(saved)
+        assertEquals(saved, SessionRepository(storage).load("2026-11-11"))
+    }
+}

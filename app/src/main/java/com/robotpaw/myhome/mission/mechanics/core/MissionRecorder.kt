@@ -27,6 +27,7 @@ class MissionRecorder(start: MissionLog = MissionLog()) {
     private var stepAgeMs = 0L           // сколько нужный канал не менялся
     private var wasWrongChannel = false
     private var previousStrength: Int? = null   // сила в прошлом кадре, пока нужный канал был активен
+    private var restMs = 0L              // сколько длится текущий покой посреди задания
 
     /**
      * @param state - обработанное состояние сигнала
@@ -91,7 +92,12 @@ class MissionRecorder(start: MissionLog = MissionLog()) {
             previousStrength = null
         }
 
+        // покой считается только после первого напряжения: замереть посреди задания, а не до начала
+        val resting = !state.isActive(Channel.FLEXOR) && !state.isActive(Channel.EXTENSOR) && log.activeMs > 0L
+        restMs = if (resting) restMs + dtMs else 0L
+
         log = log.copy(
+            longestRestMs = maxOf(log.longestRestMs, restMs),
             durationMs = log.durationMs + dtMs,
             activeMs = if (channelActive) log.activeMs + dtMs else log.activeMs,
             coContractionMs = if (co) log.coContractionMs + dtMs else log.coContractionMs,

@@ -18,6 +18,7 @@ package com.robotpaw.myhome.game
  * @param offTargetMs - сколько времени сигнал был «мимо»: после срыва или не тот канал
  * @param jitterSum - сумма скачков силы между соседними кадрами, пока нужный канал активен
  * @param jitterFrames - сколько таких скачков измерено
+ * @param longestRestMs - самая долгая пауза в покое (обе мышцы расслаблены) посреди задания, для миссии «Замри»
  */
 data class MissionLog(
     val durationMs: Long = 0L,
@@ -34,7 +35,8 @@ data class MissionLog(
     val wrongChannelEvents: Int = 0,
     val offTargetMs: Long = 0L,
     val jitterSum: Long = 0L,
-    val jitterFrames: Int = 0
+    val jitterFrames: Int = 0,
+    val longestRestMs: Long = 0L
 ) {
     // средняя сила нужного канала, пока он был активен (0..100)
     val averageStrength: Int

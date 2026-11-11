@@ -1,6 +1,10 @@
 package com.robotpaw.myhome.game.session
 
 import com.robotpaw.myhome.game.MissionStats
+import com.robotpaw.myhome.game.goals.DailyGoal
+import com.robotpaw.myhome.game.goals.GoalContext
+import com.robotpaw.myhome.game.goals.GoalKind
+import com.robotpaw.myhome.game.goals.isMet
 
 /**
  * Насколько устала рука
@@ -92,6 +96,8 @@ fun fatigueSigns(history: List<MissionStats>, sinceRestMs: Long): Set<FatigueSig
  * @param sinceRestMs - время в заданиях после последнего отдыха (не сохраняется: новый запуск - рука отдохнула)
  * @param history - статистика заданий этого запуска для поиска усталости (не сохраняется)
  * @param forcedFatigue - усталость из отладочного меню, null - считается по заданиям
+ * @param goals - цели на сегодня (1-3), по ним задаётся план
+ * @param flawlessStreak - заданий подряд без ошибок в этом запуске (миссия «Без ошибок»)
  */
 data class Session(
     val day: String,
@@ -102,7 +108,9 @@ data class Session(
     val activeMs: Long = 0L,
     val sinceRestMs: Long = 0L,
     val history: List<MissionStats> = emptyList(),
-    val forcedFatigue: Fatigue? = null
+    val forcedFatigue: Fatigue? = null,
+    val goals: List<DailyGoal> = emptyList(),
+    val flawlessStreak: Int = 0
 ) {
     val signs: Set<FatigueSign> get() = fatigueSigns(history, sinceRestMs)
 
@@ -125,7 +133,12 @@ data class Session(
         starsGained = starsGained + stars,
         activeMs = activeMs + stats.durationMs,
         sinceRestMs = sinceRestMs + stats.durationMs,
-        history = if (stats.hasData) history + stats else history
+        history = if (stats.hasData) history + stats else history,
+        flawlessStreak = when {
+            !stats.hasData -> flawlessStreak
+            stats.mistakes == 0 -> flawlessStreak + 1
+            else -> 0
+        }
     )
 
     /**
@@ -137,6 +150,34 @@ data class Session(
     fun withExtra() = copy(extra = extra + 1)
 
     fun withPlan(count: Int) = copy(plan = count.coerceIn(1, MAX_PLAN))
+
+    // цели на сегодня, сколько целей - столько заданий в плане
+    fun withGoals(list: List<DailyGoal>) = copy(goals = list).withPlan(list.size.coerceAtLeast(1))
+
+    val goalsDone: Int get() = goals.count { it.done }
+
+    // все цели, кроме необязательного челленджа, выполнены
+    val isGoalsDone: Boolean get() = goals.isNotEmpty() && goals.filter { !it.challenge }.all { it.done }
+
+    // при усталости челлендж откладывается: по правилам команды тогда одна миссия и без челленджей
+    fun isPostponed(goal: DailyGoal): Boolean = goal.challenge && !goal.done && fatigue != Fatigue.NONE
+
+    /**
+     * Отмечает цели, которые выполнило это задание. Звать после withResult, чтобы серия без ошибок уже учла задание
+     * @return сессия и только что выполненные цели (для экрана результата и звёзд)
+     */
+    fun withGoalsChecked(ctx: GoalContext): Pair<Session, List<DailyGoal>> =
+        markGoals { goal -> goal.kind.isMet(ctx.copy(flawlessStreak = flawlessStreak), goal.value) }
+
+    // разминка пройдена
+    fun withWarmUpDone(): Pair<Session, List<DailyGoal>> = markGoals { it.kind == GoalKind.WARM_UP }
+
+    private fun markGoals(met: (DailyGoal) -> Boolean): Pair<Session, List<DailyGoal>> {
+        val newly = goals.filter { !it.done && !isPostponed(it) && met(it) }
+        if (newly.isEmpty()) return this to emptyList()
+        val updated = goals.map { if (it in newly) it.copy(done = true) else it }
+        return copy(goals = updated, starsGained = starsGained + newly.sumOf { it.reward }) to newly.map { it.copy(done = true) }
+    }
 
     /**
      * Совет после задания. При сильной усталости - закончить сразу (по правилам команды при усталости одна миссия)
