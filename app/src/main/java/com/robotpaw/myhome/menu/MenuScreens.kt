@@ -36,7 +36,7 @@ fun MenuList(control: MenuControl, modifier: Modifier = Modifier) {
     }
 }
 
-enum class MainMenuChoice { CONTINUE, ROOMS, GOALS, SIGNAL_CHECK, RECALIBRATE, GALLERY }
+enum class MainMenuChoice { CONTINUE, ROOMS, GOALS, PROGRESS, SIGNAL_CHECK, RECALIBRATE, GALLERY }
 
 /**
  * Главное меню
@@ -86,6 +86,7 @@ fun MainMenuScreen(
                 },
                 done = session?.isGoalsDone == true
             ),
+            MenuItem("Мой прогресс", "чистота сигнала по дням"),
             MenuItem("Проверка сигнала", "код состояния и команды меню"),
             MenuItem("Калибровка заново", "сейчас режим: $levelText")
         ) + if (showDeveloperItems) listOf(MenuItem("Витрина компонентов", "только в debug-сборке")) else emptyList(),

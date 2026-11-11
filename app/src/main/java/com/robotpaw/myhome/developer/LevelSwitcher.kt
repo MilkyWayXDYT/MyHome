@@ -83,7 +83,8 @@ enum class DebugJump(val title: String) {
     SIGNAL_CHECK("Сигнал"),
     BREAK("Передышка"),
     SESSION_END("Итог дня"),
-    CHORES("Дела")
+    CHORES("Дела"),
+    PROGRESS("Прогресс")
 }
 
 private enum class DebugTab(val title: String) { ROOMS("Комнаты"), CHEATS("Читы"), SCREENS("Экраны") }
@@ -98,6 +99,8 @@ private enum class DebugTab(val title: String) { ROOMS("Комнаты"), CHEATS
  * @param onNewGoals - подобрать цели на сегодня заново
  * @param onNewDay - начать день заново: план, цели, квест и дела с нуля
  * @param onNewChores - подобрать дела на сегодня заново (после сюжета)
+ * @param onSampleHistory - заполнить «Мой прогресс» примером недели (для показа)
+ * @param onClearHistory - очистить историю по дням
  * @param onJumpToMission - открыть задание сразу, минуя меню и инструкцию
  * @param onWinMission - засчитать задание без игры: смена предмета и экран результата, как после настоящего прохождения
  * @param onJumpToRoom - открыть комнату; предыдущие комнаты при этом считаются пройденными
@@ -113,6 +116,8 @@ fun LevelSwitcher(
     onNewGoals: () -> Unit,
     onNewDay: () -> Unit,
     onNewChores: () -> Unit,
+    onSampleHistory: () -> Unit,
+    onClearHistory: () -> Unit,
     onJumpToMission: (Mission) -> Unit,
     onWinMission: (Mission) -> Unit,
     onJumpToRoom: (Room) -> Unit,
@@ -194,6 +199,8 @@ fun LevelSwitcher(
                     onNewGoals = onNewGoals,
                     onNewDay = onNewDay,
                     onNewChores = onNewChores,
+                    onSampleHistory = onSampleHistory,
+                    onClearHistory = onClearHistory,
                     onResetCalibration = { expanded = false; onResetCalibration() }
                 )
                 DebugTab.SCREENS -> DebugJump.entries.chunked(3).forEach { row ->
@@ -263,6 +270,8 @@ private fun CheatsTab(
     onNewGoals: () -> Unit,
     onNewDay: () -> Unit,
     onNewChores: () -> Unit,
+    onSampleHistory: () -> Unit,
+    onClearHistory: () -> Unit,
     onResetCalibration: () -> Unit
 ) {
     Section("Прогресс")
@@ -331,6 +340,9 @@ private fun CheatsTab(
             }
         )
     )
+
+    Section("Мой прогресс")
+    ButtonRow(listOf("Пример недели" to onSampleHistory, "Очистить" to onClearHistory))
 
     Section("Квест в жизни · ${session.quest?.title ?: "нет"}${if (session.questDone) " ✓" else ""}")
     ButtonRow(

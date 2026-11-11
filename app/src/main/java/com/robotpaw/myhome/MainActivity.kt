@@ -42,11 +42,13 @@ import com.robotpaw.myhome.game.RecordStatus
 import com.robotpaw.myhome.game.adapt.Adaptation
 import com.robotpaw.myhome.game.chores.Chores
 import com.robotpaw.myhome.game.goals.DailyGoal
+import com.robotpaw.myhome.game.history.History
 import com.robotpaw.myhome.game.goals.GoalContext
 import com.robotpaw.myhome.game.goals.GoalKind
 import com.robotpaw.myhome.game.goals.GoalPicker
 import com.robotpaw.myhome.game.goals.isMet
 import com.robotpaw.myhome.game.quests.RealQuests
+import com.robotpaw.myhome.game.save.HistoryRepository
 import com.robotpaw.myhome.game.save.ProfileRepository
 import com.robotpaw.myhome.game.save.SessionRepository
 import com.robotpaw.myhome.game.session.Fatigue
@@ -61,6 +63,7 @@ import com.robotpaw.myhome.menu.ChoresScreen
 import com.robotpaw.myhome.menu.GoalsScreen
 import com.robotpaw.myhome.menu.MainMenuChoice
 import com.robotpaw.myhome.menu.MainMenuScreen
+import com.robotpaw.myhome.menu.ProgressScreen
 import com.robotpaw.myhome.menu.RealQuestScreen
 import com.robotpaw.myhome.menu.RoomsScreen
 import com.robotpaw.myhome.mission.BreakScreen
@@ -171,6 +174,8 @@ private sealed interface Screen {
     data object WarmUp : Screen
     data object MainMenu : Screen
     data object Goals : Screen
+    // мой прогресс: качество управления по дням
+    data object Progress : Screen
     // дела на сегодня после сюжета
     data object Chores : Screen
     // квест в жизни и рефлексия
@@ -227,9 +232,15 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
     // Тренировка за день: цели на сегодня (1-3), по ним план заданий (лимит мягкий), и усталость
     // Цели подбираются один раз в день из открытых комнат
     val sessionRepository = remember { SessionRepository(storage) }
+    val today = remember { java.time.LocalDate.now().toString() }
+
+    // История по дням для экрана «Мой прогресс»
+    val historyRepository = remember { HistoryRepository(storage) }
+    var history by remember { mutableStateOf(historyRepository.load()) }
+    LaunchedEffect(history) { historyRepository.save(history) }
     fun pickGoals(tired: Boolean = false) = GoalPicker.pick(progress, canWarmUp = profileRepository.load() != null, tired = tired)
     var session by remember {
-        val loaded = sessionRepository.load(java.time.LocalDate.now().toString())
+        val loaded = sessionRepository.load(today)
         val withGoals = if (loaded.goals.isEmpty()) loaded.withGoals(pickGoals()) else loaded
         // квест в жизни: один в день, из заданий, уже пройденных в игре
         mutableStateOf(if (withGoals.quest == null) withGoals.withQuest(RealQuests.pick(progress)) else withGoals)
@@ -289,6 +300,7 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
         val record = RecordOutcome.of(result, progress.recordOf(result.mission))
         val stars = progress.starsFor(result)
         session = session.withResult(result.log.toStats(), stars.gained)
+        history = history.withResult(session.day, result.log)
         val ctx = GoalContext(kind, result.log, newRecord = record.status == RecordStatus.NEW, flawlessStreak = session.flawlessStreak)
         val (checked, goalsDone) = session.withGoalsChecked(ctx)
         val (afterChore, chore) = checked.withChoreDone(result.mission.id)
@@ -387,6 +399,7 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
                             }
                             MainMenuChoice.ROOMS -> Screen.RoomList
                             MainMenuChoice.GOALS -> Screen.Goals
+                            MainMenuChoice.PROGRESS -> Screen.Progress
                             MainMenuChoice.SIGNAL_CHECK -> Screen.SignalCheck
                             MainMenuChoice.RECALIBRATE -> Screen.Calibration
                             MainMenuChoice.GALLERY -> Screen.Gallery
@@ -428,6 +441,15 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
                         onBack = { screen = Screen.Goals }
                     )
                 }
+
+                Screen.Progress -> ProgressScreen(
+                    source = emulator,
+                    profile = profile,
+                    progress = progress,
+                    history = history,
+                    today = session.day,
+                    onBack = { screen = Screen.MainMenu }
+                )
 
                 Screen.Gallery -> ComponentGallery(
                     source = emulator,
@@ -604,6 +626,8 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
                         // как новый день: несделанные дела остаются, пул добирается до 3
                         if (progress.isStoryDone) startChores()
                     },
+                    onSampleHistory = { history = History.sample(session.day) },
+                    onClearHistory = { history = History() },
                     onNewChores = {
                         progress = progress.withChores(emptyList())
                         startChores()
@@ -626,6 +650,7 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
                             DebugJump.BREAK -> Screen.Break(Screen.MainMenu)
                             DebugJump.SESSION_END -> Screen.SessionEnd(Screen.MainMenu)
                             DebugJump.CHORES -> Screen.Chores
+                            DebugJump.PROGRESS -> Screen.Progress
                         }
                     },
                     onResetCalibration = {
