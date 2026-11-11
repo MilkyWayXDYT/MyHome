@@ -24,7 +24,7 @@ import com.robotpaw.myhome.ui.components.SignalBars
 import com.robotpaw.myhome.ui.theme.HomeColors
 import com.robotpaw.myhome.ui.theme.HomeType
 
-private enum class WelcomePhase { MENU, CHECK, FAILED }
+private enum class WelcomePhase { MENU, CHECK, FAILED, DRIFT }
 
 /**
  * Повторный запуск: калибровку можно пропустить, вместо неё короткая разминка
@@ -44,9 +44,28 @@ fun WelcomeBackScreen(
     onPassed: () -> Unit = {}
 ) {
     var phase by remember { mutableStateOf(if (startWithCheck) WelcomePhase.CHECK else WelcomePhase.MENU) }
+    var drift by remember { mutableStateOf<StrengthDrift?>(null) }
     when (phase) {
         WelcomePhase.MENU -> WelcomeMenu(source, profile, onCheck = { phase = WelcomePhase.CHECK }, onRecalibrate = onRecalibrate)
-        WelcomePhase.CHECK -> WarmUp(source, profile, onPassed = { onPassed(); onReady() }, onFailed = { phase = WelcomePhase.FAILED })
+        WelcomePhase.CHECK -> WarmUp(
+            source, profile,
+            onPassed = { found ->
+                // разминка пройдена, но сила другая - тоже предлагаем калибровку
+                if (found == null) {
+                    onPassed()
+                    onReady()
+                } else {
+                    drift = found
+                    phase = WelcomePhase.DRIFT
+                }
+            },
+            onFailed = { phase = WelcomePhase.FAILED }
+        )
+        WelcomePhase.DRIFT -> DriftFound(
+            source, profile, drift ?: StrengthDrift.TOO_STRONG,
+            onRecalibrate = onRecalibrate,
+            onContinue = { onPassed(); onReady() }
+        )
         WelcomePhase.FAILED -> CheckFailed(source, profile, onRecalibrate = onRecalibrate, onContinue = onReady)
     }
 }
@@ -68,7 +87,7 @@ private fun WelcomeMenu(source: SignalSource, profile: SignalProfile, onCheck: (
 }
 
 @Composable
-private fun WarmUp(source: SignalSource, profile: SignalProfile, onPassed: () -> Unit, onFailed: () -> Unit) {
+private fun WarmUp(source: SignalSource, profile: SignalProfile, onPassed: (StrengthDrift?) -> Unit, onFailed: () -> Unit) {
     val check = remember { QuickCheck() }
     var stepIndex by remember { mutableIntStateOf(0) }
     var progress by remember { mutableFloatStateOf(0f) }
@@ -76,13 +95,13 @@ private fun WarmUp(source: SignalSource, profile: SignalProfile, onPassed: () ->
 
     val input = rememberMechanicInput(source, profile) { state, dt ->
         if (finished) return@rememberMechanicInput
-        check.update(state.code, dt)
+        check.update(state.code, dt, state.flexorStrength, state.extensorStrength)
         stepIndex = check.stepIndex
         progress = check.holdProgress
         if (check.isPassed || check.failed) finished = true
     }
     LaunchedEffect(finished) {
-        if (finished) if (check.isPassed) onPassed() else onFailed()
+        if (finished) if (check.isPassed) onPassed(check.drift) else onFailed()
     }
 
     val step = QuickCheckStep.entries.getOrNull(stepIndex) ?: QuickCheckStep.REST
@@ -122,6 +141,30 @@ private fun CheckFailed(source: SignalSource, profile: SignalProfile, onRecalibr
         title = "Сигнал изменился",
         overline = "Разминка",
         subtitle = "Похоже, электроды стоят иначе, чем в прошлый раз. Лучше пройти калибровку заново."
+    ) {
+        MenuList(control)
+    }
+}
+
+// разминка пройдена, но сила сигнала заметно другая, чем при калибровке
+@Composable
+private fun DriftFound(
+    source: SignalSource,
+    profile: SignalProfile,
+    drift: StrengthDrift,
+    onRecalibrate: () -> Unit,
+    onContinue: () -> Unit
+) {
+    val control = rememberMenuControl(
+        source = source,
+        profile = profile,
+        items = listOf(MenuItem("Пройти калибровку", "пороги подстроятся под сегодняшний сигнал"), MenuItem("Всё равно продолжить")),
+        onSelect = { if (it == 0) onRecalibrate() else onContinue() }
+    )
+    HomeScreen(
+        title = drift.title,
+        overline = "Разминка пройдена",
+        subtitle = "${drift.text} Лучше пройти калибровку заново."
     ) {
         MenuList(control)
     }

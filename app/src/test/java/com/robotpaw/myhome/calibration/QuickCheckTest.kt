@@ -46,3 +46,38 @@ class QuickCheckTest {
         assertEquals(0, check.stepIndex)
     }
 }
+
+class QuickCheckDriftTest {
+    private fun QuickCheck.hold(code: String, frames: Int, flexor: Int, extensor: Int) =
+        repeat(frames) { update(code, 50L, flexor, extensor) }
+
+    // пройти разминку с заданной силой сжатия и разжатия
+    private fun pass(flexor: Int, extensor: Int): QuickCheck = QuickCheck().apply {
+        hold("10", 30, flexor, 0)
+        hold("01", 30, 0, extensor)
+        hold("00", 30, 0, 0)
+    }
+
+    @Test
+    fun normalStrength() {
+        val check = pass(70, 65)
+        org.junit.Assert.assertTrue(check.isPassed)
+        org.junit.Assert.assertNull(check.drift)
+    }
+
+    @Test
+    fun tooStrong() {
+        org.junit.Assert.assertEquals(StrengthDrift.TOO_STRONG, pass(100, 60).drift)
+    }
+
+    @Test
+    fun tooWeak() {
+        org.junit.Assert.assertEquals(StrengthDrift.TOO_WEAK, pass(70, 20).drift)
+    }
+
+    @Test
+    fun notPassedNoDrift() {
+        val check = QuickCheck().apply { hold("10", 10, 100, 0) }
+        org.junit.Assert.assertNull(check.drift)
+    }
+}
