@@ -2,6 +2,7 @@ package com.robotpaw.myhome
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -48,7 +49,11 @@ import com.robotpaw.myhome.game.goals.GoalKind
 import com.robotpaw.myhome.game.goals.GoalPicker
 import com.robotpaw.myhome.game.goals.isMet
 import com.robotpaw.myhome.game.quests.RealQuests
+import com.robotpaw.myhome.game.feedback.Report
+import com.robotpaw.myhome.game.feedback.SurveyAnswer
 import com.robotpaw.myhome.game.save.HistoryRepository
+import com.robotpaw.myhome.game.save.SurveyRepository
+import com.robotpaw.myhome.signal.UserLevel
 import com.robotpaw.myhome.game.save.ProfileRepository
 import com.robotpaw.myhome.game.save.SessionRepository
 import com.robotpaw.myhome.game.session.Fatigue
@@ -238,6 +243,11 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
     val historyRepository = remember { HistoryRepository(storage) }
     var history by remember { mutableStateOf(historyRepository.load()) }
     LaunchedEffect(history) { historyRepository.save(history) }
+
+    // Обратная связь для команды: мини-опрос раз в день и отчёт через «Поделиться»
+    val surveyRepository = remember { SurveyRepository(storage) }
+    var surveys by remember { mutableStateOf(surveyRepository.load()) }
+    LaunchedEffect(surveys) { surveyRepository.save(surveys) }
     fun pickGoals(tired: Boolean = false) = GoalPicker.pick(progress, canWarmUp = profileRepository.load() != null, tired = tired)
     var session by remember {
         val loaded = sessionRepository.load(today)
@@ -340,6 +350,24 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
         val (checked, goalsDone) = session.withWarmUpDone()
         session = checked
         progress = progress.withBonusStars(goalsDone.sumOf { it.reward }).withGoalTry(GoalKind.WARM_UP, true)
+    }
+
+    // Отчёт о тренировках текстом в обычное окно «Поделиться» (мессенджер, почта)
+    fun shareReport() {
+        val text = Report.build(
+            today = session.day,
+            levelText = if (profile.level == UserLevel.NOVICE) "новичок" else "опытный",
+            progress = progress,
+            session = session,
+            history = history,
+            surveys = surveys
+        )
+        val send = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_SUBJECT, "«Мой дом» - отчёт о тренировках")
+            putExtra(Intent.EXTRA_TEXT, text)
+        }
+        context.startActivity(Intent.createChooser(send, "Поделиться отчётом"))
     }
 
     // После задания: при усталости сначала передышка, а если план выполнен или рука сильно устала - предложить закончить
@@ -448,7 +476,8 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
                     progress = progress,
                     history = history,
                     today = session.day,
-                    onBack = { screen = Screen.MainMenu }
+                    onBack = { screen = Screen.MainMenu },
+                    onShare = { shareReport() }
                 )
 
                 Screen.Gallery -> ComponentGallery(
@@ -597,7 +626,10 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
                         val tired = session.fatigue != Fatigue.NONE
                         session = session.withExtra()
                         screen = if (tired) Screen.Break(current.next) else current.next
-                    }
+                    },
+                    surveyNeeded = surveys.none { it.day == session.day },
+                    onSurvey = { answers -> surveys = SurveyRepository.withAnswer(surveys, SurveyAnswer(session.day, answers)) },
+                    onShare = { shareReport() }
                 )
             }
 
@@ -627,7 +659,10 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
                         if (progress.isStoryDone) startChores()
                     },
                     onSampleHistory = { history = History.sample(session.day) },
-                    onClearHistory = { history = History() },
+                    onClearHistory = {
+                        history = History()
+                        surveys = emptyList()
+                    },
                     onNewChores = {
                         progress = progress.withChores(emptyList())
                         startChores()

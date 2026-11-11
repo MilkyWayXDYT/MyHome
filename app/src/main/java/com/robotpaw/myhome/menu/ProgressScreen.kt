@@ -41,6 +41,7 @@ private val WEEKDAYS = listOf("пн", "вт", "ср", "чт", "пт", "сб", "�
  * Главный показатель - чистота сигнала и встречные сигналы (так прогресс оценивают и в «Моторике»)
  * @param history - история тренировок по дням
  * @param today - сегодняшняя дата «2026-11-11»
+ * @param onShare - поделиться отчётом о тренировках (обратная связь для команды)
  */
 @Composable
 fun ProgressScreen(
@@ -49,15 +50,16 @@ fun ProgressScreen(
     progress: GameProgress,
     history: History,
     today: String,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onShare: () -> Unit = {}
 ) {
     val control = rememberMenuControl(
         source = source,
         profile = profile,
-        items = emptyList(),
+        items = listOf(MenuItem("Поделиться отчётом", "отправить команде, как прошли тренировки")),
         backTitle = "В меню",
         onBack = onBack,
-        onSelect = {}
+        onSelect = { onShare() }
     )
     val week = history.lastDays(today)
     val todayStats = week.last()

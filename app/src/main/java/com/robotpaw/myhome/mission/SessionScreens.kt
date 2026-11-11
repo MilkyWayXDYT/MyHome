@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -16,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.robotpaw.myhome.game.Stars
+import com.robotpaw.myhome.game.feedback.SurveyQuestion
 import com.robotpaw.myhome.game.formatTime
 import com.robotpaw.myhome.game.session.Fatigue
 import com.robotpaw.myhome.game.session.Session
@@ -97,8 +99,12 @@ fun BreakScreen(
 
 /**
  * План на день выполнен или рука устала: предлагаем закончить, но можно взять ещё задание
+ * Раз в день перед итогами - мини-опрос из трёх вопросов (можно пропустить)
+ * @param surveyNeeded - сегодня опрос ещё не проходили
+ * @param onSurvey - ответы опроса (номера ответов по порядку вопросов)
  * @param onFinish - закончить на сегодня
  * @param onMore - ещё одно задание
+ * @param onShare - поделиться отчётом о тренировках
  */
 @Composable
 fun SessionEndScreen(
@@ -106,17 +112,50 @@ fun SessionEndScreen(
     profile: SignalProfile,
     session: Session,
     onFinish: () -> Unit,
-    onMore: () -> Unit
+    onMore: () -> Unit,
+    surveyNeeded: Boolean = false,
+    onSurvey: (List<Int>) -> Unit = {},
+    onShare: () -> Unit = {}
 ) {
+    // номер вопроса опроса, null - опрос закончен или не нужен
+    var question by remember { mutableStateOf(if (surveyNeeded) 0 else null) }
+    var answers by remember { mutableStateOf(emptyList<Int>()) }
+
+    val current = question?.let { SurveyQuestion.entries.getOrNull(it) }
+    if (current != null) {
+        SurveyStep(source, profile, current, number = question!! + 1) { answer ->
+            if (answer == null) {
+                question = null   // пропустить опрос
+            } else {
+                answers = answers + answer
+                val next = question!! + 1
+                if (next >= SurveyQuestion.entries.size) {
+                    onSurvey(answers)
+                    question = null
+                } else {
+                    question = next
+                }
+            }
+        }
+        return
+    }
+
     val tired = session.fatigue == Fatigue.TIRED
     val control = rememberMenuControl(
         source = source,
         profile = profile,
         items = listOf(
             MenuItem("Закончить на сегодня", "в главное меню"),
-            MenuItem("Ещё одно задание", if (session.fatigue != Fatigue.NONE) "сначала передышка" else null)
+            MenuItem("Ещё одно задание", if (session.fatigue != Fatigue.NONE) "сначала передышка" else null),
+            MenuItem("Поделиться отчётом", "отправить команде, как прошли тренировки")
         ),
-        onSelect = { if (it == 0) onFinish() else onMore() }
+        onSelect = {
+            when (it) {
+                0 -> onFinish()
+                1 -> onMore()
+                else -> onShare()
+            }
+        }
     )
 
     HomeScreen(
@@ -136,6 +175,36 @@ fun SessionEndScreen(
         }
         Spacer(Modifier.weight(1f))
         MenuList(control)
+    }
+}
+
+/**
+ * Вопрос опроса: ответы - пункты меню, последний пункт пропускает опрос
+ * @param onAnswer - номер ответа, null - пропустить опрос
+ */
+@Composable
+private fun SurveyStep(
+    source: SignalSource,
+    profile: SignalProfile,
+    question: SurveyQuestion,
+    number: Int,
+    onAnswer: (Int?) -> Unit
+) {
+    // новый вопрос - новое меню, выбор начинается с первого ответа
+    key(question) {
+        val control = rememberMenuControl(
+            source = source,
+            profile = profile,
+            items = question.options.map { MenuItem(it) } + MenuItem("Пропустить опрос"),
+            onSelect = { onAnswer(if (it < question.options.size) it else null) }
+        )
+        HomeScreen(
+            title = question.text,
+            overline = "Короткий опрос · $number из ${SurveyQuestion.entries.size}",
+            subtitle = "Ответы помогут сделать тренировки лучше."
+        ) {
+            MenuList(control)
+        }
     }
 }
 
