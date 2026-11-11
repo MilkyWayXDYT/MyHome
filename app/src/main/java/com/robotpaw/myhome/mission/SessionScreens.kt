@@ -1,5 +1,8 @@
 package com.robotpaw.myhome.mission
 
+import com.robotpaw.myhome.sound.Sounds
+import com.robotpaw.myhome.sound.Sfx
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -50,6 +53,7 @@ fun BreakScreen(
     onDone: () -> Unit
 ) {
     val totalMs = session.fatigue.restSeconds * 1000L
+    LaunchedEffect(Unit) { Sounds.play(Sfx.STOP) }
     var restedMs by remember { mutableLongStateOf(0L) }
     var relaxed by remember { mutableStateOf(false) }
 

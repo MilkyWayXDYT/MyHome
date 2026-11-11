@@ -1,5 +1,7 @@
 package com.robotpaw.myhome.menu
 
+import com.robotpaw.myhome.sound.Sounds
+import com.robotpaw.myhome.sound.Sfx
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -91,7 +93,10 @@ fun rememberMenuControl(
             control.holdProgress = if (currentEnabled) detector.progress else 0f
 
             if (event == null || !currentEnabled) return@collect
-            when (val action = control.navigator.onEvent(event)) {
+            val action = control.navigator.onEvent(event)
+            // «тык» на каждый переход по пунктам и на выбор
+            if (action != null || control.navigator.selected != control.selected) Sounds.play(Sfx.TAP)
+            when (action) {
                 is MenuAction.Select ->
                     if (action.index >= baseCount) currentOnBack() else currentOnSelect(action.index)
                 MenuAction.Back -> if (hasBack) currentOnBack()

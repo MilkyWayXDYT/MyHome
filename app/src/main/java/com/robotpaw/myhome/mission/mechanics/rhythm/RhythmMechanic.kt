@@ -1,5 +1,7 @@
 package com.robotpaw.myhome.mission.mechanics.rhythm
 
+import com.robotpaw.myhome.sound.Sounds
+import com.robotpaw.myhome.sound.Sfx
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -84,6 +86,7 @@ fun RhythmMechanic(
         if (event.hit) {
             lastResult = "Попал!"
             lastHit = true
+            Sounds.play(Sfx.CHOP)   // нож режет в такт
         }
         if (event.miss) {
             recorder.addError()

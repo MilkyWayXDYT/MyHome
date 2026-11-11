@@ -69,6 +69,10 @@ import com.robotpaw.myhome.menu.GoalsScreen
 import com.robotpaw.myhome.menu.MainMenuChoice
 import com.robotpaw.myhome.menu.MainMenuScreen
 import com.robotpaw.myhome.menu.ProgressScreen
+import com.robotpaw.myhome.menu.SettingsChoice
+import com.robotpaw.myhome.menu.SettingsScreen
+import com.robotpaw.myhome.sound.Sfx
+import com.robotpaw.myhome.sound.Sounds
 import com.robotpaw.myhome.menu.RealQuestScreen
 import com.robotpaw.myhome.menu.RoomsScreen
 import com.robotpaw.myhome.mission.BreakScreen
@@ -157,6 +161,7 @@ class MainActivity : ComponentActivity() {
                 ApplicationInfo.FLAG_DEBUGGABLE) != 0
 
         emulator.start()
+        Sounds.init(this)
 
         setContent {
             MaterialTheme {
@@ -168,6 +173,22 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    // музыка играет, только пока приложение на экране
+    override fun onStart() {
+        super.onStart()
+        Sounds.onStart()
+    }
+
+    override fun onStop() {
+        Sounds.onStop()
+        super.onStop()
+    }
+
+    override fun onDestroy() {
+        if (isFinishing) Sounds.release()
+        super.onDestroy()
     }
 }
 
@@ -186,6 +207,7 @@ private sealed interface Screen {
     // квест в жизни и рефлексия
     data object RealQuest : Screen
     data object SignalCheck : Screen
+    data object Settings : Screen
     data object Gallery : Screen
     data object RoomList : Screen
     data class Room(val roomId: String, val wall: Int = 0) : Screen
@@ -212,6 +234,10 @@ private sealed interface Screen {
     // план на день выполнен или рука устала; next - куда идти, если игрок возьмёт ещё задание
     data class SessionEnd(val next: Screen) : Screen
 }
+
+// ключи настроек звука в хранилище
+private const val KEY_MUSIC = "sound_music"
+private const val KEY_EFFECTS = "sound_effects"
 
 private fun roomScreenOf(mission: Mission): Screen.Room {
     val room = Rooms.of(mission)
@@ -243,6 +269,24 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
     val historyRepository = remember { HistoryRepository(storage) }
     var history by remember { mutableStateOf(historyRepository.load()) }
     LaunchedEffect(history) { historyRepository.save(history) }
+
+    // Звук: фоновая музыка и эффекты, выключатели в настройках сохраняются
+    var musicOn by remember { mutableStateOf(storage.getString(KEY_MUSIC) != "0") }
+    var effectsOn by remember { mutableStateOf(storage.getString(KEY_EFFECTS) != "0") }
+    LaunchedEffect(musicOn) {
+        storage.putString(KEY_MUSIC, if (musicOn) "1" else "0")
+        Sounds.musicOn = musicOn
+    }
+    LaunchedEffect(effectsOn) {
+        storage.putString(KEY_EFFECTS, if (effectsOn) "1" else "0")
+        Sounds.effectsOn = effectsOn
+    }
+    // приветствие при запуске
+    LaunchedEffect(Unit) { Sounds.play(Sfx.WELCOME) }
+    // звук действия (жарка, стиралка) не тянется за игроком в комнату и меню
+    LaunchedEffect(screen) {
+        if (screen !is Screen.Play && screen !is Screen.Change && screen !is Screen.Result) Sounds.stopAction()
+    }
 
     // Обратная связь для команды: мини-опрос раз в день и отчёт через «Поделиться»
     val surveyRepository = remember { SurveyRepository(storage) }
@@ -428,8 +472,7 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
                             MainMenuChoice.ROOMS -> Screen.RoomList
                             MainMenuChoice.GOALS -> Screen.Goals
                             MainMenuChoice.PROGRESS -> Screen.Progress
-                            MainMenuChoice.SIGNAL_CHECK -> Screen.SignalCheck
-                            MainMenuChoice.RECALIBRATE -> Screen.Calibration
+                            MainMenuChoice.SETTINGS -> Screen.Settings
                             MainMenuChoice.GALLERY -> Screen.Gallery
                         }
                     }
@@ -489,7 +532,23 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
                 Screen.SignalCheck -> SignalCheckScreen(
                     source = emulator,
                     profile = profile,
-                    onExit = { screen = Screen.MainMenu }
+                    onExit = { screen = Screen.Settings }
+                )
+
+                Screen.Settings -> SettingsScreen(
+                    source = emulator,
+                    profile = profile,
+                    musicOn = musicOn,
+                    effectsOn = effectsOn,
+                    onChoice = { choice ->
+                        when (choice) {
+                            SettingsChoice.MUSIC -> musicOn = !musicOn
+                            SettingsChoice.EFFECTS -> effectsOn = !effectsOn
+                            SettingsChoice.SIGNAL_CHECK -> screen = Screen.SignalCheck
+                            SettingsChoice.RECALIBRATE -> screen = Screen.Calibration
+                        }
+                    },
+                    onBack = { screen = Screen.MainMenu }
                 )
 
                 Screen.RoomList -> RoomsScreen(

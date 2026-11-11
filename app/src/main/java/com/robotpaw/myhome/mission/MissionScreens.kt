@@ -1,5 +1,7 @@
 package com.robotpaw.myhome.mission
 
+import com.robotpaw.myhome.sound.Sounds
+import com.robotpaw.myhome.sound.Sfx
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -168,6 +170,8 @@ fun PauseScreen(
 ) {
     var secondsLeft by remember { mutableIntStateOf(PAUSE_SECONDS) }
     LaunchedEffect(Unit) {
+        Sounds.stopAction()
+        Sounds.play(Sfx.STOP)
         while (secondsLeft > 0) {
             delay(1000)
             secondsLeft--
@@ -218,6 +222,7 @@ fun ResultScreen(
     levelChange: Int = 0,
     onChoice: (ResultChoice) -> Unit
 ) {
+    LaunchedEffect(Unit) { Sounds.play(Sfx.DONE) }
     val control = rememberMenuControl(
         source = source,
         profile = profile,

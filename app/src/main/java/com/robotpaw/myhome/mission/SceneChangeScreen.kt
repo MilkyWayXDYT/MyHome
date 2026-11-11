@@ -1,5 +1,7 @@
 package com.robotpaw.myhome.mission
 
+import com.robotpaw.myhome.sound.Sounds
+import com.robotpaw.myhome.sound.MissionSounds
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -32,6 +34,7 @@ fun SceneChangeScreen(
 ) {
     val art = RoomScenes.of(mission.kind)
     val change = remember { Animatable(0f) }
+    val pet = LocalPet.current
 
     LaunchedEffect(Unit) {
         if (art == null) {
@@ -39,6 +42,8 @@ fun SceneChangeScreen(
             return@LaunchedEffect
         }
         delay(PAUSE_BEFORE_MS)
+        // звук предмета вместе со сменой «до» на «после»
+        Sounds.play(MissionSounds.done(mission.kind, pet))
         change.animateTo(1f, tween(CHANGE_MS, easing = FastOutSlowInEasing))
         delay(PAUSE_AFTER_MS)
         onFinished()

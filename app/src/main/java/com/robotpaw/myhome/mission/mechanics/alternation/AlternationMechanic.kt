@@ -1,5 +1,7 @@
 package com.robotpaw.myhome.mission.mechanics.alternation
 
+import com.robotpaw.myhome.sound.Sounds
+import com.robotpaw.myhome.sound.MissionSounds
 import com.robotpaw.myhome.mission.mechanics.core.rememberMechanicInput
 import com.robotpaw.myhome.mission.mechanics.core.MechanicAttempt
 import com.robotpaw.myhome.mission.mechanics.core.MissionRecorder
@@ -62,6 +64,8 @@ fun AlternationMechanic(
         recorder.onFrame(state, dt, rules.current?.takeIf { !it.rest }?.channel)
         val event = rules.update(state, dt)
         if (event.overshoot) recorder.addError()
+        // звук действия: кубик лёг, чай налился и т. п. (MissionSounds)
+        if (event.stepCompleted) Sounds.play(MissionSounds.step(mission.kind, rules.stepIndex - 1), action = true)
 
         total = rules.progress
         stepProgress = rules.stepProgress
