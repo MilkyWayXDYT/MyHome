@@ -9,6 +9,7 @@ import com.robotpaw.myhome.game.GameProgress
 import com.robotpaw.myhome.game.Room
 import com.robotpaw.myhome.game.Rooms
 import com.robotpaw.myhome.game.goals.DailyGoal
+import com.robotpaw.myhome.game.quests.RealQuests
 import com.robotpaw.myhome.game.session.Session
 import com.robotpaw.myhome.signal.SignalProfile
 import com.robotpaw.myhome.signal.SignalSource
@@ -127,6 +128,7 @@ fun RoomsScreen(
  * Цели на сегодня: 1-3 миссии из открытых комнат. Выбор цели ведёт к подходящему заданию
  * @param session - цели и план на сегодня
  * @param onOpen - перейти к заданию для цели
+ * @param onOpenQuest - открыть квест в жизни (последний пункт перед «Назад»)
  */
 @Composable
 fun GoalsScreen(
@@ -134,9 +136,19 @@ fun GoalsScreen(
     profile: SignalProfile,
     session: Session,
     onOpen: (DailyGoal) -> Unit,
+    onOpenQuest: () -> Unit = {},
     onBack: () -> Unit
 ) {
     val goals = session.goals
+    val quest = session.quest
+    val questItem = quest?.let {
+        MenuItem(
+            title = "В жизни: ${it.title}",
+            subtitle = if (session.questDone) "рассказано · +${RealQuests.REWARD} ★"
+            else "сделайте по-настоящему и расскажите, как вышло · +${RealQuests.REWARD} ★",
+            done = session.questDone
+        )
+    }
     val control = rememberMenuControl(
         source = source,
         profile = profile,
@@ -151,12 +163,15 @@ fun GoalsScreen(
                 subtitle = listOfNotNull(goal.condition, goal.kind.where, note).joinToString("\n"),
                 done = goal.done
             )
-        },
+        } + listOfNotNull(questItem),
         backTitle = "В меню",
         onBack = onBack,
         onSelect = { index ->
-            val goal = goals[index]
-            if (!goal.done && !session.isPostponed(goal)) onOpen(goal)
+            val goal = goals.getOrNull(index)
+            when {
+                goal == null -> if (!session.questDone) onOpenQuest()
+                !goal.done && !session.isPostponed(goal) -> onOpen(goal)
+            }
         }
     )
 

@@ -44,6 +44,7 @@ import com.robotpaw.myhome.game.goals.GoalContext
 import com.robotpaw.myhome.game.goals.GoalKind
 import com.robotpaw.myhome.game.goals.GoalPicker
 import com.robotpaw.myhome.game.goals.isMet
+import com.robotpaw.myhome.game.quests.RealQuests
 import com.robotpaw.myhome.game.save.ProfileRepository
 import com.robotpaw.myhome.game.save.SessionRepository
 import com.robotpaw.myhome.game.session.Fatigue
@@ -57,6 +58,7 @@ import com.robotpaw.myhome.developer.SignalCheckScreen
 import com.robotpaw.myhome.menu.GoalsScreen
 import com.robotpaw.myhome.menu.MainMenuChoice
 import com.robotpaw.myhome.menu.MainMenuScreen
+import com.robotpaw.myhome.menu.RealQuestScreen
 import com.robotpaw.myhome.menu.RoomsScreen
 import com.robotpaw.myhome.mission.BreakScreen
 import com.robotpaw.myhome.mission.InstructionScreen
@@ -166,6 +168,8 @@ private sealed interface Screen {
     data object WarmUp : Screen
     data object MainMenu : Screen
     data object Goals : Screen
+    // квест в жизни и рефлексия
+    data object RealQuest : Screen
     data object SignalCheck : Screen
     data object Gallery : Screen
     data object RoomList : Screen
@@ -218,7 +222,9 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
     fun pickGoals(tired: Boolean = false) = GoalPicker.pick(progress, canWarmUp = profileRepository.load() != null, tired = tired)
     var session by remember {
         val loaded = sessionRepository.load(java.time.LocalDate.now().toString())
-        mutableStateOf(if (loaded.goals.isEmpty()) loaded.withGoals(pickGoals()) else loaded)
+        val withGoals = if (loaded.goals.isEmpty()) loaded.withGoals(pickGoals()) else loaded
+        // квест в жизни: один в день, из заданий, уже пройденных в игре
+        mutableStateOf(if (withGoals.quest == null) withGoals.withQuest(RealQuests.pick(progress)) else withGoals)
     }
     LaunchedEffect(session) { sessionRepository.save(session) }
 
@@ -279,6 +285,8 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
                 updated = updated.withGoalTry(goal, goal.isMet(ctx, value))
             }
         progress = updated
+        // первое пройденное задание открывает квесты в жизни уже сегодня
+        if (session.quest == null) session = session.withQuest(RealQuests.pick(progress))
 
         val resultScreen = Screen.Result(
             result,
@@ -368,8 +376,28 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
                                 ?: Screen.Room(progress.currentRoom().id)
                         }
                     },
+                    onOpenQuest = { screen = Screen.RealQuest },
                     onBack = { screen = Screen.MainMenu }
                 )
+
+                Screen.RealQuest -> {
+                    val quest = session.quest
+                    // квеста нет (например, сбросили прогресс в отладке) - обратно к целям
+                    if (quest == null) LaunchedEffect(Unit) { screen = Screen.Goals }
+                    else RealQuestScreen(
+                        source = emulator,
+                        profile = profile,
+                        quest = quest,
+                        practice = RealQuests.practiceFor(quest, progress),
+                        onAnswered = { reflection ->
+                            val reward = if (session.questDone) 0 else RealQuests.REWARD
+                            session = session.withQuestDone()
+                            progress = progress.withReflection(quest, reflection).withBonusStars(reward)
+                        },
+                        onPractice = { screen = roomScreenOf(it) },
+                        onBack = { screen = Screen.Goals }
+                    )
+                }
 
                 Screen.Gallery -> ComponentGallery(
                     source = emulator,
@@ -527,7 +555,7 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
                     session = session,
                     onSessionChange = { session = it },
                     onNewGoals = { session = session.withGoals(pickGoals(tired = session.fatigue == Fatigue.TIRED)) },
-                    onNewDay = { session = Session(session.day).withGoals(pickGoals()) },
+                    onNewDay = { session = Session(session.day).withGoals(pickGoals()).withQuest(RealQuests.pick(progress)) },
                     onJumpToMission = { screen = Screen.Play(it) },
                     // без статистики задание даёт одну звезду, как заглушка
                     onWinMission = { finishMission(MissionResult(it)) },

@@ -5,6 +5,8 @@ import com.robotpaw.myhome.game.goals.DailyGoal
 import com.robotpaw.myhome.game.goals.GoalContext
 import com.robotpaw.myhome.game.goals.GoalKind
 import com.robotpaw.myhome.game.goals.isMet
+import com.robotpaw.myhome.game.quests.RealQuest
+import com.robotpaw.myhome.game.quests.RealQuests
 
 /**
  * Насколько устала рука
@@ -98,6 +100,8 @@ fun fatigueSigns(history: List<MissionStats>, sinceRestMs: Long): Set<FatigueSig
  * @param forcedFatigue - усталость из отладочного меню, null - считается по заданиям
  * @param goals - цели на сегодня (1-3), по ним задаётся план
  * @param flawlessStreak - заданий подряд без ошибок в этом запуске (миссия «Без ошибок»)
+ * @param quest - квест в жизни на сегодня (null - ещё ни одного не открыто)
+ * @param questDone - игрок рассказал, как прошёл квест
  */
 data class Session(
     val day: String,
@@ -110,7 +114,9 @@ data class Session(
     val history: List<MissionStats> = emptyList(),
     val forcedFatigue: Fatigue? = null,
     val goals: List<DailyGoal> = emptyList(),
-    val flawlessStreak: Int = 0
+    val flawlessStreak: Int = 0,
+    val quest: RealQuest? = null,
+    val questDone: Boolean = false
 ) {
     val signs: Set<FatigueSign> get() = fatigueSigns(history, sinceRestMs)
 
@@ -168,6 +174,13 @@ data class Session(
      */
     fun withGoalsChecked(ctx: GoalContext): Pair<Session, List<DailyGoal>> =
         markGoals { goal -> goal.kind.isMet(ctx.copy(flawlessStreak = flawlessStreak), goal.value) }
+
+    // квест на сегодня
+    fun withQuest(quest: RealQuest?) = copy(quest = quest, questDone = false)
+
+    // игрок рассказал, как прошёл квест: звезда за ответ
+    fun withQuestDone(): Session = if (questDone || quest == null) this
+    else copy(questDone = true, starsGained = starsGained + RealQuests.REWARD)
 
     // разминка пройдена
     fun withWarmUpDone(): Pair<Session, List<DailyGoal>> = markGoals { it.kind == GoalKind.WARM_UP }

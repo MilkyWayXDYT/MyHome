@@ -2,6 +2,8 @@ package com.robotpaw.myhome.game
 
 import com.robotpaw.myhome.game.goals.GoalKind
 import com.robotpaw.myhome.game.goals.GoalTries
+import com.robotpaw.myhome.game.quests.RealQuest
+import com.robotpaw.myhome.game.quests.Reflection
 
 /**
  * Пройденные задания, выбранный питомец, лучшие результаты и звёзды
@@ -12,7 +14,8 @@ data class GameProgress(
     val records: Map<String, MissionRecord> = emptyMap(),
     val stars: Map<String, Int> = emptyMap(),
     val bonusStars: Int = 0,
-    val goalTries: Map<GoalKind, GoalTries> = emptyMap()
+    val goalTries: Map<GoalKind, GoalTries> = emptyMap(),
+    val reflections: Map<RealQuest, Reflection> = emptyMap()
 ) {
 
     fun withPet(pet: PetKind) = copy(pet = pet)
@@ -29,6 +32,11 @@ data class GameProgress(
     fun withBonusStars(count: Int) = copy(bonusStars = bonusStars + count)
 
     fun goalTriesOf(kind: GoalKind): GoalTries = goalTries[kind] ?: GoalTries()
+
+    // последний ответ игрока после квеста в жизни (null - квест ещё не проходили)
+    fun reflectionOf(quest: RealQuest): Reflection? = reflections[quest]
+
+    fun withReflection(quest: RealQuest, reflection: Reflection) = copy(reflections = reflections + (quest to reflection))
 
     /**
      * Запоминает попытку миссии (для поиска слабого навыка)

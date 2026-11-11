@@ -7,10 +7,13 @@ import com.robotpaw.myhome.game.Rooms
 import com.robotpaw.myhome.game.Stars
 import com.robotpaw.myhome.game.goals.GoalKind
 import com.robotpaw.myhome.game.goals.GoalTries
+import com.robotpaw.myhome.game.quests.QuestFeeling
+import com.robotpaw.myhome.game.quests.RealQuest
+import com.robotpaw.myhome.game.quests.Reflection
 
 /**
  * Сохраняет и загружает прогресс игры: пройденные задания, выбранного питомца, лучшие результаты, звёзды
- * и попытки миссий (по ним ищется слабый навык)
+ * попытки миссий (по ним ищется слабый навык) и ответы после квестов в жизни
  * Профиль калибровки хранится отдельно, в ProfileRepository
  * Новые данные (звёзды, лучшие результаты) добавляются сюда же отдельными ключами
  */
@@ -28,7 +31,11 @@ class ProgressRepository(private val storage: KeyValueStorage) {
         val stars = knownMissions.mapNotNull { id -> storage.getString(starsKey(id))?.toIntOrNull()?.let { id to it.coerceIn(0, Stars.MAX) } }.toMap()
         val bonus = storage.getString(KEY_BONUS_STARS)?.toIntOrNull()?.coerceAtLeast(0) ?: 0
         val tries = GoalKind.entries.mapNotNull { kind -> parseTries(storage.getString(triesKey(kind)))?.let { kind to it } }.toMap()
-        return GameProgress(completedMissions = completed, pet = pet, records = records, stars = stars, bonusStars = bonus, goalTries = tries)
+        val reflections = RealQuest.entries.mapNotNull { quest -> parseReflection(storage.getString(questKey(quest)))?.let { quest to it } }.toMap()
+        return GameProgress(
+            completedMissions = completed, pet = pet, records = records, stars = stars,
+            bonusStars = bonus, goalTries = tries, reflections = reflections
+        )
     }
 
     fun save(progress: GameProgress) {
@@ -43,7 +50,15 @@ class ProgressRepository(private val storage: KeyValueStorage) {
         GoalKind.entries.forEach { kind ->
             storage.putString(triesKey(kind), progress.goalTries[kind]?.let { "${it.tries};${it.wins}" })
         }
+        RealQuest.entries.forEach { quest ->
+            storage.putString(questKey(quest), progress.reflections[quest]?.feeling?.name)
+        }
     }
+
+    private fun questKey(quest: RealQuest) = "$KEY_QUEST_PREFIX${quest.name}"
+
+    private fun parseReflection(text: String?): Reflection? =
+        QuestFeeling.entries.firstOrNull { it.name == text }?.let { Reflection(it) }
 
     private fun triesKey(kind: GoalKind) = "$KEY_GOAL_PREFIX${kind.name}"
 
@@ -77,5 +92,6 @@ class ProgressRepository(private val storage: KeyValueStorage) {
         const val KEY_STARS_PREFIX = "stars_"
         const val KEY_BONUS_STARS = "bonus_stars"
         const val KEY_GOAL_PREFIX = "goal_"
+        const val KEY_QUEST_PREFIX = "quest_"
     }
 }

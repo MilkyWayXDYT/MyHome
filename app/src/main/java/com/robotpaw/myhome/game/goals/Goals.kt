@@ -19,6 +19,7 @@ import com.robotpaw.myhome.game.MissionKind.TRASH
 import com.robotpaw.myhome.game.MissionKind.VACUUM
 import com.robotpaw.myhome.game.MissionLog
 import com.robotpaw.myhome.game.Rooms
+import com.robotpaw.myhome.game.quests.RealQuests
 import kotlin.random.Random
 
 /**
@@ -147,7 +148,8 @@ data class DailyGoal(
 
 /**
  * Подбор целей на день по правилам команды:
- * одна - под самый слабый навык, одна - случайная из открытых, третья - необязательный челлендж.
+ * одна - под самый слабый навык (первым идёт навык, где квест в жизни «не вышел»),
+ * одна - случайная из открытых, третья - необязательный челлендж.
  * Цели берутся только из открытых комнат, при усталости - одна цель без челленджа
  */
 object GoalPicker {
@@ -178,9 +180,13 @@ object GoalPicker {
         if (pool.isEmpty()) return emptyList()
         val result = mutableListOf<DailyGoal>()
 
-        // слабый навык - меньше всего удачных попыток; если ещё ничего не пробовали - случайная
+        // слабый навык: сначала тот, где квест в жизни «не вышел», потом - меньше всего удачных попыток,
+        // если ещё ничего не пробовали - случайная
+        val failed = RealQuests.failedSkills(progress)
         val tried = pool.filter { progress.goalTriesOf(it).tries > 0 }
-        val weakest = tried.minByOrNull { progress.goalTriesOf(it).rate } ?: pool.random(random)
+        val weakest = pool.firstOrNull { it in failed }
+            ?: tried.minByOrNull { progress.goalTriesOf(it).rate }
+            ?: pool.random(random)
         result += DailyGoal(weakest, tierOf(weakest, progress))
         pool -= weakest
         if (tired || pool.isEmpty()) return result

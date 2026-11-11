@@ -42,6 +42,7 @@ import com.robotpaw.myhome.game.Mission
 import com.robotpaw.myhome.game.PetKind
 import com.robotpaw.myhome.game.Room
 import com.robotpaw.myhome.game.Rooms
+import com.robotpaw.myhome.game.quests.RealQuests
 import com.robotpaw.myhome.game.session.Fatigue
 import com.robotpaw.myhome.game.session.Session
 import com.robotpaw.myhome.ui.theme.HomeColors
@@ -300,6 +301,14 @@ private fun CheatsTab(
         listOf(
             "Новые цели" to onNewGoals,
             "Выполнить все" to { onSessionChange(session.copy(goals = session.goals.map { it.copy(done = true) })) }
+        )
+    )
+
+    Section("Квест в жизни · ${session.quest?.title ?: "нет"}${if (session.questDone) " ✓" else ""}")
+    ButtonRow(
+        listOf(
+            "Другой квест" to { onSessionChange(session.withQuest(RealQuests.pick(progress, except = session.quest))) },
+            "Забыть ответы" to { onProgressChange(progress.copy(reflections = emptyMap())) }
         )
     )
 
