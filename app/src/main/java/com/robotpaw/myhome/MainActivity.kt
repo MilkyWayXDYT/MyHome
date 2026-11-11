@@ -39,6 +39,7 @@ import com.robotpaw.myhome.game.RecordOutcome
 import com.robotpaw.myhome.game.StarsOutcome
 import com.robotpaw.myhome.game.toStats
 import com.robotpaw.myhome.game.RecordStatus
+import com.robotpaw.myhome.game.adapt.Adaptation
 import com.robotpaw.myhome.game.chores.Chores
 import com.robotpaw.myhome.game.goals.DailyGoal
 import com.robotpaw.myhome.game.goals.GoalContext
@@ -190,7 +191,9 @@ private sealed interface Screen {
         val record: RecordOutcome,
         val stars: StarsOutcome,
         val goals: List<DailyGoal> = emptyList(),
-        val chore: Boolean = false
+        val chore: Boolean = false,
+        // адаптивная сложность: +1 в следующий раз сложнее, -1 легче
+        val levelChange: Int = 0
     ) : Screen
     // предмет в комнате меняется на «после», затем экран результата next
     data class Change(val next: Result) : Screen
@@ -300,6 +303,10 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
                 val value = goal.tiers.getOrElse(GoalPicker.tierOf(goal, progress)) { 0 }
                 updated = updated.withGoalTry(goal, goal.isMet(ctx, value))
             }
+        // адаптивная сложность: следующий раз задание чуть сложнее или легче
+        val oldLevel = progress.levelOf(result.mission)
+        val newLevel = Adaptation.next(oldLevel, result.log.toStats())
+        updated = updated.withLevel(result.mission, newLevel)
         progress = updated
         // первое пройденное задание открывает квесты в жизни уже сегодня
         if (session.quest == null) session = session.withQuest(RealQuests.pick(progress))
@@ -310,7 +317,8 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
             record = record,
             stars = stars.copy(total = progress.totalStars),
             goals = goalsDone,
-            chore = chore
+            chore = chore,
+            levelChange = newLevel - oldLevel
         )
         screen = if (RoomScenes.of(result.mission.kind) != null) Screen.Change(resultScreen) else resultScreen
     }
@@ -478,7 +486,9 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
                     onDone = { finishMission(it) },
                     onPause = { checkpoint -> screen = Screen.Pause(current.mission, checkpoint) },
                     pet = progress.pet ?: PetKind.CAT,
-                    onPetChosen = { progress = progress.withPet(it) }
+                    onPetChosen = { progress = progress.withPet(it) },
+                    // адаптивная сложность: уровень задания, при усталости на ступень легче
+                    level = Adaptation.effective(progress.levelOf(current.mission), session.fatigue)
                 ) }
 
                 is Screen.Pause -> PauseScreen(
@@ -512,6 +522,7 @@ fun MyHomeApp(emulator: EmulatorSignalSource, isDebug: Boolean) {
                     stars = current.stars,
                     goals = current.goals,
                     chore = current.chore,
+                    levelChange = current.levelChange,
                     onChoice = { choice ->
                         screen = afterMission(when (choice) {
                             ResultChoice.ROOM -> {

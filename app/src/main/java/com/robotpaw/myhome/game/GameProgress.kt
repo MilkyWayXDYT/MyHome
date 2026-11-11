@@ -16,7 +16,8 @@ data class GameProgress(
     val bonusStars: Int = 0,
     val goalTries: Map<GoalKind, GoalTries> = emptyMap(),
     val reflections: Map<RealQuest, Reflection> = emptyMap(),
-    val chores: List<String> = emptyList()
+    val chores: List<String> = emptyList(),
+    val levels: Map<String, Int> = emptyMap()
 ) {
 
     fun withPet(pet: PetKind) = copy(pet = pet)
@@ -98,6 +99,11 @@ data class GameProgress(
         val index = Rooms.ALL.indexOf(room)
         return index <= 0 || isDone(Rooms.ALL[index - 1])
     }
+
+    // уровень адаптивной сложности задания (Adaptation), 0 - как задумано
+    fun levelOf(mission: Mission): Int = levels[mission.id] ?: 0
+
+    fun withLevel(mission: Mission, level: Int) = copy(levels = if (level == 0) levels - mission.id else levels + (mission.id to level))
 
     // несделанные дела после сюжета: переходят на следующий день
     fun withChores(ids: List<String>) = copy(chores = ids)

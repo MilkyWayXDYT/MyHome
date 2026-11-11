@@ -1,6 +1,7 @@
 package com.robotpaw.myhome.developer
 
 import com.robotpaw.myhome.game.GameProgress
+import com.robotpaw.myhome.game.adapt.Adaptation
 import com.robotpaw.myhome.game.Mission
 import com.robotpaw.myhome.game.Room
 import com.robotpaw.myhome.game.Rooms
@@ -59,3 +60,13 @@ fun GameProgress.withRoomReset(room: Room): GameProgress {
 }
 
 fun GameProgress.withoutPet(): GameProgress = copy(pet = null)
+
+// уровень сложности задания по кругу: 0 → +1 → +2 → -2 → -1 → 0
+fun GameProgress.withNextLevel(mission: Mission): GameProgress {
+    val next = levelOf(mission) + 1
+    return withLevel(mission, if (next > Adaptation.MAX) Adaptation.MIN else next)
+}
+
+// всем заданиям один уровень сложности
+fun GameProgress.withAllLevels(level: Int): GameProgress =
+    copy(levels = if (level == 0) emptyMap() else Rooms.ALL.flatMap { it.missions }.associate { it.id to level })

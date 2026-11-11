@@ -42,6 +42,7 @@ import com.robotpaw.myhome.game.Mission
 import com.robotpaw.myhome.game.PetKind
 import com.robotpaw.myhome.game.Room
 import com.robotpaw.myhome.game.Rooms
+import com.robotpaw.myhome.game.adapt.Adaptation
 import com.robotpaw.myhome.game.quests.RealQuests
 import com.robotpaw.myhome.game.session.Fatigue
 import com.robotpaw.myhome.game.session.Session
@@ -215,7 +216,7 @@ private fun RoomsTab(
     onWinMission: (Mission) -> Unit,
     onJumpToRoom: (Room) -> Unit
 ) {
-    Text("▶ играть · ✓ пройти сразу · ★ звёзды · ● отметка", fontSize = 12.sp, color = HomeColors.InkSecondary)
+    Text("▶ играть · ✓ пройти сразу · ★ звёзды · ● отметка · ± сложность", fontSize = 12.sp, color = HomeColors.InkSecondary)
     Rooms.ALL.forEach { room ->
         Spacer(Modifier.height(12.dp))
         val summary = progress.summaryOf(room)
@@ -247,6 +248,7 @@ private fun RoomsTab(
                 SmallButton("✓") { onWinMission(mission) }
                 SmallButton("★${progress.starsOf(mission)}") { onProgressChange(progress.withNextStarsOf(mission)) }
                 SmallButton(if (done) "●" else "○") { onProgressChange(progress.withMissionDone(mission, !done)) }
+                SmallButton(levelText(progress.levelOf(mission))) { onProgressChange(progress.withNextLevel(mission)) }
             }
         }
     }
@@ -283,6 +285,15 @@ private fun CheatsTab(
     ButtonRow(
         PetKind.entries.map { pet -> pet.title to { onProgressChange(progress.withPet(pet)) } } +
                 listOf("Нет" to { onProgressChange(progress.withoutPet()) })
+    )
+
+    Section("Сложность заданий")
+    ButtonRow(
+        listOf(
+            "Все легче" to { onProgressChange(progress.withAllLevels(Adaptation.MIN)) },
+            "Обычно" to { onProgressChange(progress.withAllLevels(0)) },
+            "Все сложнее" to { onProgressChange(progress.withAllLevels(Adaptation.MAX)) }
+        )
     )
 
     Section("Сегодня ${session.done} из ${session.plan} · усталость: ${session.fatigue.title}")
@@ -332,6 +343,9 @@ private fun CheatsTab(
     Section("Калибровка")
     ButtonRow(listOf("Забыть калибровку" to onResetCalibration))
 }
+
+// уровень сложности кнопкой: «−2», «0», «+1»
+private fun levelText(level: Int) = if (level > 0) "+$level" else "$level"
 
 @Composable
 private fun Section(title: String) {

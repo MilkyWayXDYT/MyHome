@@ -29,13 +29,18 @@ import com.robotpaw.myhome.ui.theme.HomeColors
 import com.robotpaw.myhome.ui.theme.HomeType
 
 // если за это время дверь не открылась - показываем окно поддержки
-private const val ATTEMPT_LIMIT_MS = 20_000L
+const val DOOR_ATTEMPT_LIMIT_MS = 20_000L
+
+// сколько держать сжатие, чтобы открыть дверь
+const val DOOR_HOLD_MS = 3000L
 
 /**
  * Задание «Дверь» (обучение): сжать кисть и держать
  * @param checkpoint - откуда продолжаем (после окна поддержки)
  * @param onDone - дверь открыта, лог для экрана результата
  * @param onPause - нужна пауза; в первый раз прогресс сохраняется, потом начинается заново
+ * @param holdMs - сколько держать сжатие (адаптивная сложность меняет его в MissionMechanic)
+ * @param attemptLimitMs - через сколько показать окно поддержки
  */
 @Composable
 fun DoorMechanic(
@@ -45,9 +50,11 @@ fun DoorMechanic(
     mission: Mission,
     checkpoint: MissionCheckpoint,
     onDone: (MissionLog) -> Unit,
-    onPause: (MissionCheckpoint) -> Unit
+    onPause: (MissionCheckpoint) -> Unit,
+    holdMs: Long = DOOR_HOLD_MS,
+    attemptLimitMs: Long = DOOR_ATTEMPT_LIMIT_MS
 ) {
-    val rules = remember { DoorRules(keepProgress = profile.level == UserLevel.NOVICE).apply { restore(checkpoint.progress) } }
+    val rules = remember { DoorRules(holdMs = holdMs, keepProgress = profile.level == UserLevel.NOVICE).apply { restore(checkpoint.progress) } }
     val recorder = remember { MissionRecorder(checkpoint.log) }
     var progress by remember { mutableFloatStateOf(checkpoint.progress) }
     val attempt = remember { MechanicAttempt() }
@@ -63,7 +70,7 @@ fun DoorMechanic(
         if (opened) {
             attempt.finished = true
             onDone(recorder.snapshot())
-        } else if (attempt.ms >= ATTEMPT_LIMIT_MS) {
+        } else if (attempt.ms >= attemptLimitMs) {
             attempt.finished = true
             val firstTime = recorder.snapshot().pauses == 0
             recorder.addPause()

@@ -87,6 +87,7 @@ fun InstructionScreen(
  * @param onPause - окно поддержки; чекпоинт вернётся в этот экран, если игрок выберет «Продолжить»
  * @param pet - выбранный питомец (для заданий финала)
  * @param onPetChosen - игрок выбрал питомца в задании «Питомец»
+ * @param level - адаптивная сложность задания, 0 - как задумано
  */
 @Composable
 fun MissionScreen(
@@ -98,7 +99,8 @@ fun MissionScreen(
     onDone: (MissionResult) -> Unit,
     onPause: (MissionCheckpoint) -> Unit,
     pet: PetKind = PetKind.CAT,
-    onPetChosen: (PetKind) -> Unit = {}
+    onPetChosen: (PetKind) -> Unit = {},
+    level: Int = 0
 ) {
     if (Mechanics.has(mission.kind)) {
         MissionMechanic(
@@ -110,7 +112,8 @@ fun MissionScreen(
             onDone = { log -> onDone(MissionResult(mission, log)) },
             onPause = onPause,
             pet = pet,
-            onPetChosen = onPetChosen
+            onPetChosen = onPetChosen,
+            level = level
         )
     } else {
         StubMission(source, profile, roomTitle, mission, onDone) { onPause(checkpoint) }
@@ -212,6 +215,7 @@ fun ResultScreen(
     stars: StarsOutcome,
     goals: List<DailyGoal> = emptyList(),
     chore: Boolean = false,
+    levelChange: Int = 0,
     onChoice: (ResultChoice) -> Unit
 ) {
     val control = rememberMenuControl(
@@ -251,6 +255,11 @@ fun ResultScreen(
                 fontSize = HomeType.Label, color = HomeColors.InkSecondary
             )
             StatRow("Всего звёзд", stars.total.toString())
+            // адаптивная сложность: игрок видит, что игра подстраивается
+            when {
+                levelChange > 0 -> Text("Отлично! В следующий раз задание будет чуть сложнее", fontSize = HomeType.Label, color = HomeColors.Accent)
+                levelChange < 0 -> Text("В следующий раз задание будет чуть легче", fontSize = HomeType.Label, color = HomeColors.InkSecondary)
+            }
         }
         // дело на сегодня (после сюжета)
         if (chore) {
